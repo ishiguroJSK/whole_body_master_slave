@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find ps3joy)/launch/ps3.launch" />
+  <node pkg="openni_tracker" type="joy_gait_publisher.py" name="joy_gait_publisher" output="screen"/>
+</launch>

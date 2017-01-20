@@ -1,0 +1,18 @@
+<launch>
+
+  <arg name="DEV_R" default="/dev/input/mouse1" />
+  <node pkg="joy_mouse" type="mouse.py" name="joy_mouse_R" output="screen">
+    <param name="dev" value="$(arg DEV_R)" />
+    <remap from="joy" to="/mouse_R/joy" />
+  </node>
+
+  <arg name="DEV_L" default="/dev/input/mouse2" />
+  <node pkg="joy_mouse" type="mouse.py" name="joy_mouse_L" output="screen">
+    <param name="dev" value="$(arg DEV_L)" />
+    <remap from="joy" to="/mouse_L/joy" />
+  </node>
+
+
+
+  <node pkg="openni_tracker" type="mouse_gait_publisher.py" name="mouse_gait_publisher" output="screen"/>
+</launch>
