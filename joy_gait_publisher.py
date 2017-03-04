@@ -84,8 +84,6 @@ def pubhumanpose():
     pub_val_com.pose.orientation.z = quaternion[2]
     pub_val_com.pose.orientation.w = quaternion[3]
     
-    
-    
     r2l_vec = np.array([pub_val_lf.pose.position.x - pub_val_rf.pose.position.x, pub_val_lf.pose.position.y - pub_val_rf.pose.position.y])
     if np.linalg.norm(r2l_vec) > 0.3:
       pub_val_lf.pose.position.x = 0.3 * r2l_vec[0]/np.linalg.norm(r2l_vec) + pub_val_rf.pose.position.x
@@ -94,8 +92,10 @@ def pubhumanpose():
       pub_val_lf.pose.position.y = pub_val_rf.pose.position.y + 0.16
     pub_val_lfw.wrench.force.z = 0
     pub_val_rfw.wrench.force.z = 600
+    pub_val_lf.pose.position.z = 0.03
     pub_val_com.pose.position.x = pub_val_rf.pose.position.x
     pub_val_com.pose.position.y = pub_val_rf.pose.position.y
+    
   elif commode == "LEFT":
     pub_val_rf.pose.position.x += rf_vel[0] / HZ
     pub_val_rf.pose.position.y += rf_vel[1] / HZ
@@ -119,6 +119,7 @@ def pubhumanpose():
       pub_val_rf.pose.position.y = pub_val_lf.pose.position.y - 0.16
     pub_val_lfw.wrench.force.z = 600
     pub_val_rfw.wrench.force.z = 0
+    pub_val_rf.pose.position.z = 0.03
     pub_val_com.pose.position.x = pub_val_lf.pose.position.x
     pub_val_com.pose.position.y = pub_val_lf.pose.position.y
     
@@ -131,6 +132,12 @@ def pubhumanpose():
     pub_val_com.pose.orientation.y = quaternion[1]
     pub_val_com.pose.orientation.z = quaternion[2]
     pub_val_com.pose.orientation.w = quaternion[3]
+    
+  
+  pub_val_rh.pose.position.x = pub_val_com.pose.position.x
+  pub_val_rh.pose.position.y = pub_val_com.pose.position.y
+  pub_val_lh.pose.position.x = pub_val_com.pose.position.x
+  pub_val_lh.pose.position.y = pub_val_com.pose.position.y
     
   for i in range(len(pub_list)):
     pub_list[i].publish(pub_val_list[i])

@@ -24,8 +24,9 @@ pub_val_list = [pub_val_com, pub_val_rf, pub_val_lf, pub_val_rh, pub_val_lh, pub
 key_list = ["com", "rf", "lf", "rh", "lh", "rfw", "lfw"]
 label_list = ["X","Y","Z","R","P","Y"]
 topic_d = {"com":PoseStamped, "rf":PoseStamped, "lf":PoseStamped, "rh":PoseStamped, "lh":PoseStamped, "rfw":WrenchStamped, "lfw":WrenchStamped}
-POSMINMAX = 0.5/100
-ROTMINMAX = math.pi/100
+POSMINMAX = 0.5/100.0
+ROTMINMAX = 45.0/180.0*math.pi/100.0
+testrad = 0
 
 class TestThread(threading.Thread):
 
@@ -35,8 +36,14 @@ class TestThread(threading.Thread):
 
   def run(self):
     print "enter ROS pub thread"
+    loop = 0
     while not rospy.is_shutdown():
+      loop += 1
       for i in range(len(pub_list)):
+        
+        pub_val_list[0].pose.position.x = testrad * math.sin(loop/100.0 * 2*math.pi /10)
+        pub_val_list[0].pose.position.y = testrad * math.cos(loop/100.0 * 2*math.pi /10)
+        
         pub_list[i].publish(pub_val_list[i])
       r.sleep()
 
@@ -83,7 +90,7 @@ class App(QMainWindow):
     self.w.show()
   
   def on_draw(self):
-    global pub_val_list 
+    global pub_val_list, testrad
     
     for i in range(0, len(key_list)-2):
       pub_val_list[i].pose.position.x = self.slider_list[i][0].value() *POSMINMAX
@@ -108,6 +115,8 @@ class App(QMainWindow):
       pub_val_list[i].wrench.force.y = self.slider_list[i][1].value() * 10.0
       pub_val_list[i].wrench.force.z = self.slider_list[i][2].value() * 10.0
       self.label_list[i].setText( key_list[i] + ": %+4.3f"%pub_val_list[i].wrench.force.x + " %+4.3f"%pub_val_list[i].wrench.force.y + " %+4.3f"%pub_val_list[i].wrench.force.z)
+
+    testrad = pub_val_list[0].pose.position.y
 
 if __name__ == '__main__':
   signal.signal(signal.SIGINT, signal.SIG_DFL)
