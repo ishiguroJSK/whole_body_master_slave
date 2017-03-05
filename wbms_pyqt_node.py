@@ -199,6 +199,7 @@ if __name__ == '__main__':
   
   lines_2d = [com_PltItm.plot() for i in range(6)]
   hulls_2d = [com_PltItm.plot() for i in range(len(rsr))]
+  hull_h_2d = [com_PltItm.plot()]
   lines_rf = [rf_PltItm.plot() for i in range(2)]
   lines_lf = [lf_PltItm.plot() for i in range(2)]
   texts_2d = [pg.TextItem(text="Default text", anchor=(0,0)) for i in range(5)]
@@ -309,11 +310,28 @@ if __name__ == '__main__':
       hull_ans[_Y].append(points[hull.vertices[i]][_Y])
     hull_ans[_X].append(points[hull.vertices[0]][_X])
     hull_ans[_Y].append(points[hull.vertices[0]][_Y])
-    
     rsr[-1] = hull_ans
     if loop % 10 == 0:
       rsr.append(hull_ans)
       rsr.pop(0)
+      
+    points = np.array([
+                 [hrf[_X][-1]+0.02,hrf[_Y][-1]+0.02],
+                 [hrf[_X][-1]+0.02,hrf[_Y][-1]+0.01],
+                 [hrf[_X][-1]-0.01,hrf[_Y][-1]+0.02],
+                 [hrf[_X][-1]-0.01,hrf[_Y][-1]+0.01],
+                 [hlf[_X][-1]+0.02,hlf[_Y][-1]-0.02],
+                 [hlf[_X][-1]+0.02,hlf[_Y][-1]-0.01],
+                 [hlf[_X][-1]-0.01,hlf[_Y][-1]-0.02],
+                 [hlf[_X][-1]-0.01,hlf[_Y][-1]-0.01],
+                 ])
+    hull = sp.spatial.ConvexHull(points)
+    hsr = [[],[]]
+    for i in range(len(hull.vertices)):
+      hsr[_X].append(points[hull.vertices[i]][_X])
+      hsr[_Y].append(points[hull.vertices[i]][_Y])
+    hsr[_X].append(points[hull.vertices[0]][_X])
+    hsr[_Y].append(points[hull.vertices[0]][_Y])
       
     if loop % 30 == 0:
       com_PltItm.enableAutoRange()
@@ -337,36 +355,39 @@ if __name__ == '__main__':
     all_PltItms[5].setData(pos=(np.array(rlf)*scale_3d).transpose(), size=5)
     
     lines_2d[0].setData(hcom[_Y],hcom[_X])
-    lines_2d[0].setPen(pg.mkPen("r", style=QtCore.Qt.DotLine) )
+    lines_2d[0].setPen(pg.mkPen((200,200,200), style=QtCore.Qt.DotLine,width=2) )
     texts_2d[0].setText("HumanCOM")
     texts_2d[0].setPos(hcom[_Y][-1],hcom[_X][-1])
     
     lines_2d[1].setData(rzmp[_Y],rzmp[_X])
-    lines_2d[1].setPen(pg.mkPen((255,255,0),width=2) )
+    lines_2d[1].setPen(pg.mkPen((255,255,0),width=3) )
     texts_2d[1].setText("ZMP")
     texts_2d[1].setPos(rzmp[_Y][-1],rzmp[_X][-1])
     
     lines_2d[2].setData(rdcp[_Y],rdcp[_X])
-    lines_2d[2].setPen(pg.mkPen("r",width=2) )
+    lines_2d[2].setPen(pg.mkPen("r",width=3) )
     texts_2d[2].setText("DCP")
     texts_2d[2].setPos(rdcp[_Y][-1],rdcp[_X][-1])
     
     lines_2d[3].setData(racp[_Y],racp[_X])
-    lines_2d[3].setPen(pg.mkPen("b",width=2) )
+    lines_2d[3].setPen(pg.mkPen("b",width=3) )
     texts_2d[3].setText("ACP")
     texts_2d[3].setPos(racp[_Y][-1],racp[_X][-1])
     
     lines_2d[4].setData(rcom[_Y],rcom[_X])
-    lines_2d[4].setPen(pg.mkPen("g",width=3) )
+    lines_2d[4].setPen(pg.mkPen("g",width=4) )
     texts_2d[4].setText("RobotCOM")
     texts_2d[4].setPos(rcom[_Y][-1],rcom[_X][-1])
+    
+    hull_h_2d.setData(hsr[_Y],hsr[_X])### Human SR
+    hull_h_2d.setPen(pg.mkPen("r", style=QtCore.Qt.DotLine,width=2) )
     
     for i in range(len(rsr)):
       hulls_2d[i].setData(rsr[i][_Y],rsr[i][_X])
       brightness = int(255.0*i/len(rsr))
       hulls_2d[i].setPen(pg.mkPen((brightness,brightness,brightness),width=1,style=QtCore.Qt.DashLine))
     
-    lines_rf[0].setData(logtime,hrf[_Z])
+    lines_rf[0].setData(logtime,hrf[_Z],width=2)
     lines_rf[0].setPen(pg.mkPen("r", style=QtCore.Qt.DotLine) )
     texts_rf[0].setText("HumanRF")
     texts_rf[0].setPos(logtime[-1],hrf[_Z][-1])
@@ -376,7 +397,7 @@ if __name__ == '__main__':
     texts_rf[1].setText("RobotRF")
     texts_rf[1].setPos(logtime[-1],rrf[_Z][-1])
      
-    lines_lf[0].setData(logtime,hlf[_Z])
+    lines_lf[0].setData(logtime,hlf[_Z],width=2)
     lines_lf[0].setPen(pg.mkPen("r", style=QtCore.Qt.DotLine) )
     texts_lf[0].setText("HumanLF")
     texts_lf[0].setPos(logtime[-1],hlf[_Z][-1])
