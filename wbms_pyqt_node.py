@@ -9,6 +9,7 @@ import threading
 import signal
 import rospy
 import math
+import tf
 from std_msgs.msg import *
 from geometry_msgs.msg import *
 import pyqtgraph as pg
@@ -223,6 +224,16 @@ if __name__ == '__main__':
     if MODE == "ROS":
       cur_s = sub_val_r_com.header.stamp.to_sec()
       logtime.append(cur_s)
+      
+      
+      
+# 
+#       from geometry_msgs.msg import Vector3
+#       
+#       e = tf.transformations.euler_from_quaternion((quaternion.x, quaternion.y, quaternion.z, quaternion.w))
+#       return Vector3(x=e[0], y=e[1], z=e[2])
+
+      
       for i in range(_XYZ):
         hcom[i].append([sub_val_h_com.pose.position.x,sub_val_h_com.pose.position.y,sub_val_h_com.pose.position.z][i])
         rcom[i].append([sub_val_r_com.pose.position.x,sub_val_r_com.pose.position.y,sub_val_r_com.pose.position.z][i])
