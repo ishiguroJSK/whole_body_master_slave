@@ -1,0 +1,4 @@
+<launch>
+  <include file="$(find hrpsys_choreonoid_tutorials)/launch/jaxon_red_choreonoid.launch"/>
+  <include file="$(find whole_body_master_slave)/launch/all.launch"/>
+</launch>

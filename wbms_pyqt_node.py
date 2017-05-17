@@ -199,7 +199,7 @@ if __name__ == '__main__':
   
   lines_2d = [com_PltItm.plot() for i in range(6)]
   hulls_2d = [com_PltItm.plot() for i in range(len(rsr))]
-  hull_h_2d = [com_PltItm.plot()]
+#   hull_h_2d = com_PltItm.plot()
   lines_rf = [rf_PltItm.plot() for i in range(2)]
   lines_lf = [lf_PltItm.plot() for i in range(2)]
   texts_2d = [pg.TextItem(text="Default text", anchor=(0,0)) for i in range(5)]
@@ -379,8 +379,8 @@ if __name__ == '__main__':
     texts_2d[4].setText("RobotCOM")
     texts_2d[4].setPos(rcom[_Y][-1],rcom[_X][-1])
     
-    hull_h_2d.setData(hsr[_Y],hsr[_X])### Human SR
-    hull_h_2d.setPen(pg.mkPen("r", style=QtCore.Qt.DotLine,width=2) )
+#     hull_h_2d.setData(hsr[_Y],hsr[_X])### Human SR
+#     hull_h_2d.setPen(pg.mkPen("r", style=QtCore.Qt.DotLine,width=2) )
     
     for i in range(len(rsr)):
       hulls_2d[i].setData(rsr[i][_Y],rsr[i][_X])

@@ -1,0 +1,25 @@
+<launch>
+<!--  <include file="$(find openni_launch)/launch/openni.launch"/>-->
+
+	<remap from="vive_rcon_pose" 	to="human_tracker_rf_ref"/>
+	<remap from="vive_lcon_pose" 	to="human_tracker_lf_ref"/>
+<!--	<remap from="vive_rcon_pose" 	to="human_tracker_lf_ref"/>-->
+<!--	<remap from="vive_lcon_pose" 	to="human_tracker_rf_ref"/>-->
+	<remap from="vive_head_pose" to="human_tracker_head_ref"/>
+  <include file="$(find vive_image_view)/launch/multisense.launch"/>
+  <include file="$(find openni_launch)/launch/openni.launch"/>
+  
+  <node pkg="tf" type="static_transform_publisher" name="world_to_camera" args="2 0 0 3.14 0 0 world camera_link 10"/> 
+  <node pkg="tf" type="static_transform_publisher" name="world_to_openni" args="2 0 0 0 0 0 world world_openni 10"/> 
+  <node pkg="tf" type="static_transform_publisher" name="world_to_vive" 	args="2 0.25 0 0 0 0 world world_vive 10"/> 
+
+
+	<remap from="openni_com_pose"	to="human_tracker_com_ref"/>
+	<remap from="openni_rh_pose" 	to="human_tracker_rh_ref"/>
+	<remap from="openni_lh_pose" 	to="human_tracker_lh_ref"/>
+  <include file="$(find whole_body_master_slave)/launch/openni_tracker.launch"/>
+
+<!--  <include file="$(find leptrino_reader)/launch/LR_both.launch"/>-->
+<!--  <include file="$(find whole_body_master_slave)/launch/rviz_wbms.launch"/>-->
+  <include file="$(find whole_body_master_slave)/launch/rviz_wbms_light.launch"/>
+</launch>

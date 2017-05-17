@@ -1,8 +1,0 @@
-<launch>
-    <node pkg="openni_tracker" type="openni_tracker" name="openni_tracker" output="screen">
-        <param name="camera_frame_id" value="camera_depth_frame" />
-    </node>
-    <node pkg="tf" type="static_transform_publisher" name="odom_to_camera" args=" 2.0 -1.5 1.0 3.1415 0 0 odom camera_link 10"/> 
-    <node pkg="tf" type="static_transform_publisher" name="odom_to_rfw" args=" 0 0 0 -1.5708 1.5708 0 right_foot_1 right_foot_wrench_cood 10"/> 
-    <node pkg="tf" type="static_transform_publisher" name="odom_to_lfw" args=" 0 0 0 -1.5708 1.5708 0 left_foot_1 left_foot_wrench_cood 10"/> 
-</launch>
