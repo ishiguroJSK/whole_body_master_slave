@@ -1,25 +1,17 @@
 <launch>
-<!--  <include file="$(find openni_launch)/launch/openni.launch"/>-->
 
-	<remap from="vive_rcon_pose" 	to="human_tracker_rf_ref"/>
-	<remap from="vive_lcon_pose" 	to="human_tracker_lf_ref"/>
-<!--	<remap from="vive_rcon_pose" 	to="human_tracker_lf_ref"/>-->
-<!--	<remap from="vive_lcon_pose" 	to="human_tracker_rf_ref"/>-->
-	<remap from="vive_head_pose" to="human_tracker_head_ref"/>
-  <include file="$(find vive_image_view)/launch/multisense.launch"/>
-  <include file="$(find openni_launch)/launch/openni.launch"/>
-  
-  <node pkg="tf" type="static_transform_publisher" name="world_to_camera" args="2 0 0 3.14 0 0 world camera_link 10"/> 
-  <node pkg="tf" type="static_transform_publisher" name="world_to_openni" args="2 0 0 0 0 0 world world_openni 10"/> 
-  <node pkg="tf" type="static_transform_publisher" name="world_to_vive" 	args="2 0.25 0 0 0 0 world world_vive 10"/> 
+  <include file="$(find vive_ros)/launch/vive.launch"/>
 
+  <node name="world_vive_to_operator_origin" pkg="tf" type="static_transform_publisher" args="0 -2 -1 -1.570796 -1.570796 0 /world_vive /operator_origin 1000" />
+  <node name="vive_sn_to_lh" pkg="tf" type="static_transform_publisher" args="0 0 0 0 1.570796 -1.570796 /controller_LHR_FD2D1945 /vive_lh_tf 1000" />
+  <node name="vive_sn_to_rh" pkg="tf" type="static_transform_publisher" args="0 0 0 0 1.570796 -1.570796 /controller_LHR_FF39B943 /vive_rh_tf 1000" />
+  <node name="vive_sn_tp_com" pkg="tf" type="static_transform_publisher" args="0 0 0 1.570796 1.570796 0 /tracker_LHR_09DC9A32 /vive_com_tf 1000" />
+  <node name="vive_sn_to_lf" pkg="tf" type="static_transform_publisher" args="0 0 0 1.570796 3.141592 0 /tracker_LHR_1ADE74F2 /vive_lf_tf 1000" />
+  <node name="vive_sn_to_rf" pkg="tf" type="static_transform_publisher" args="0 0 0 1.570796 3.141592 0 /tracker_LHR_03DCC6A7 /vive_rf_tf 1000" />
+  <node name="vive_sn_to_head" pkg="tf" type="static_transform_publisher" args="0 0 0 0 1.570796 -1.570796 /hmd /vive_head_tf 1000" />
 
-	<remap from="openni_com_pose"	to="human_tracker_com_ref"/>
-	<remap from="openni_rh_pose" 	to="human_tracker_rh_ref"/>
-	<remap from="openni_lh_pose" 	to="human_tracker_lh_ref"/>
-  <include file="$(find whole_body_master_slave)/launch/openni_tracker.launch"/>
+  <node name="TF2PoseStamped" pkg="whole_body_master_slave" type="TF2PoseStamped.py" output="screen" required="true"/>
 
-<!--  <include file="$(find leptrino_reader)/launch/LR_both.launch"/>-->
-<!--  <include file="$(find whole_body_master_slave)/launch/rviz_wbms.launch"/>-->
-  <include file="$(find whole_body_master_slave)/launch/rviz_wbms_light.launch"/>
+  <node pkg="rviz" type="rviz" name="rviz" args="-d $(find whole_body_master_slave)/config/vive_ros.rviz" output="screen"/>
+
 </launch>
