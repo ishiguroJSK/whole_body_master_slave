@@ -25,8 +25,8 @@ pub_val_list = [pub_val_com, pub_val_rf, pub_val_lf, pub_val_rh, pub_val_lh, pub
 key_list = ["com", "rf", "lf", "rh", "lh", "head", "rfw", "lfw"]
 label_list = ["X","Y","Z","R","P","Y"]
 topic_d = {"com":PoseStamped, "rf":PoseStamped, "lf":PoseStamped, "rh":PoseStamped, "lh":PoseStamped, "head":PoseStamped, "rfw":WrenchStamped, "lfw":WrenchStamped}
-POSMINMAX = 0.4/100.0
-ROTMINMAX = 45.0/180.0*math.pi/100.0
+POSMINMAX = 1.0/100.0
+ROTMINMAX = 60.0/180.0*math.pi/100.0
 
 class TestThread(threading.Thread):
 
