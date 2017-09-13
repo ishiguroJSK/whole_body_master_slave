@@ -61,7 +61,7 @@ if __name__ == '__main__':
       pub_val_com.pose.position.y = 0
     elif loop < HZ * 7 :
       pub_val_com.pose.position.y = -0.1
-      pub_val_com.pose.position.z = -0.1
+      pub_val_com.pose.position.z = -0.0
       pub_val_lf.pose.position.y = 0.2
       pub_val_rh.pose.position.x = 0.3
       pub_val_rh.pose.position.y = -0.5
@@ -71,6 +71,7 @@ if __name__ == '__main__':
 
     elif loop < HZ * 9 : 
       pub_val_rh.pose.position.y = 1.2
+      pub_val_lh.pose.position.x = -0.2
       pub_val_lh.pose.position.y = 0.5
 
     for i in range(len(pub_list)):
