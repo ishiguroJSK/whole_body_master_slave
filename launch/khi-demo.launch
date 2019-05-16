@@ -3,6 +3,13 @@
   <remap from="/vive/controller_LHR_FD2D1945/joy" to="/vive_lh_joy" />
   <remap from="/vive/controller_LHR_FF39B943/joy" to="/vive_rh_joy" />
 
+  <remap from="/image_left" to="/camera/color/image_raw" />
+  <remap from="/image_right" to="/camera/color/image_raw" />
+  <!-- <remap from="/image_left" to="/camera/color/image_raw/image_compressed" /> -->
+  <!-- <remap from="/image_right" to="/camera/color/image_raw/image_compressed" /> -->
+  <remap from="/camera_info_left" to="/camera/color/camera_info" />
+  <remap from="/camera_info_right" to="/camera/color/camera_info" />
+
   <include file="$(find vive_ros)/launch/vive.launch"/>
 
   <node name="world_vive_to_operator_origin" pkg="tf" type="static_transform_publisher" args="0 -2 -1 -1.570796 -1.570796 0 /world_vive /operator_origin 1000" />
@@ -23,9 +30,9 @@
   <!-- <remap from="/float32_out" to="/thk_hand_controller/right/refpos" /> -->
   <!-- <node name="Joy2Float32_rh" pkg="whole_body_master_slave" type="Joy2Float32.py" output="screen" required="true"/> -->
 
-  <node name="topic_tools_lh_joy_to_lfw_wrench" pkg="topic_tools" type="transform" args='/vive_lh_joy /human_tracker_lfw_ref geometry_msgs/WrenchStamped "geometry_msgs.msg.WrenchStamped(header=m.header,wrench=geometry_msgs.msg.Wrench(force=geometry_msgs.msg.Vector3(m.axes[2],0,0),torque=geometry_msgs.msg.Vector3(0,0,0)))" --import geometry_msgs --wait-for-start' output="screen" required="true"/>
+  <node name="topic_tools_lh_joy_to_lfw_wrench" pkg="topic_tools" type="transform" args='/vive_lh_joy /human_tracker_lfw_ref geometry_msgs/WrenchStamped "geometry_msgs.msg.WrenchStamped(header=m.header,wrench=geometry_msgs.msg.Wrench(force=geometry_msgs.msg.Vector3(m.axes[2]*0.5,m.buttons[0],m.buttons[3]),torque=geometry_msgs.msg.Vector3(0,0,0)))" --import geometry_msgs --wait-for-start' output="screen" required="true"/>
   
-  <node name="topic_tools_rh_joy_to_rfw_wrench" pkg="topic_tools" type="transform" args='/vive_rh_joy /human_tracker_rfw_ref geometry_msgs/WrenchStamped "geometry_msgs.msg.WrenchStamped(header=m.header,wrench=geometry_msgs.msg.Wrench(force=geometry_msgs.msg.Vector3(m.axes[2],0,0),torque=geometry_msgs.msg.Vector3(0,0,0)))" --import geometry_msgs --wait-for-start' output="screen" required="true"/>
+  <node name="topic_tools_rh_joy_to_rfw_wrench" pkg="topic_tools" type="transform" args='/vive_rh_joy /human_tracker_rfw_ref geometry_msgs/WrenchStamped "geometry_msgs.msg.WrenchStamped(header=m.header,wrench=geometry_msgs.msg.Wrench(force=geometry_msgs.msg.Vector3(m.axes[2]*0.5,m.buttons[0],m.buttons[3]),torque=geometry_msgs.msg.Vector3(0,0,0)))" --import geometry_msgs --wait-for-start' output="screen" required="true"/>
 
   <node pkg="rviz" type="rviz" name="rviz" args="-d $(find whole_body_master_slave)/config/vive_ros.rviz" output="screen"/>
 
