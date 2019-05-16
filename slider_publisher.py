@@ -36,6 +36,10 @@ class TestThread(threading.Thread):
 
   def run(self):
     print "enter ROS pub thread"
+ 
+    for i in range(len(key_list)-2):
+      pub_val_list[i].pose.orientation.w = 1 # quatanion 0,0,0,0は色々バグる
+
     while not rospy.is_shutdown():
       for i in range(len(pub_list)):
         pub_list[i].publish(pub_val_list[i])
