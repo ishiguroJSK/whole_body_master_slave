@@ -23,6 +23,7 @@ slave_origin = "BODY"
 
 def sub_tf_from_master(pw):
     os.environ['ROS_MASTER_URI'] = master_host
+    os.environ['ROS_IP'] = "192.168.96.113"
     rospy.init_node("sub_tf_from_master", anonymous=True)
     tfl = tf.TransformListener()
     rate = rospy.Rate(200)
@@ -45,8 +46,9 @@ def sub_tf_from_master(pw):
 
 def pub_wrench_to_master(ww):
     os.environ['ROS_MASTER_URI'] = master_host
+    os.environ['ROS_IP'] = "192.168.96.113"
     rospy.init_node("pub_wrench_to_master", anonymous=True)
-    pubs = [rospy.Publisher("/feedback/"+w+"_wrench_wld",WrenchStamped, queue_size=1) for w in w_tgts]
+    pubs = [rospy.Publisher("/feedback_"+w+"sensor",WrenchStamped, queue_size=1) for w in w_tgts]
     rate = rospy.Rate(200)
     while not rospy.is_shutdown():
         tm_start = time.time()
@@ -68,6 +70,7 @@ def pub_wrench_to_master(ww):
         
 def pub_pose_to_slave(pw):
     os.environ['ROS_MASTER_URI'] = slave_host
+    os.environ['ROS_IP'] = "192.168.96.113"
     rospy.init_node("pub_pose_to_slave", anonymous=True)
     pubs = [rospy.Publisher("/human_tracker_"+p+"_ref", PoseStamped, queue_size=1) for p in p_tgts]
     rate = rospy.Rate(200)
@@ -92,6 +95,7 @@ def pub_pose_to_slave(pw):
 
 def sub_wrench_from_slave(wl):
     os.environ['ROS_MASTER_URI'] = slave_host
+    os.environ['ROS_IP'] = "192.168.96.113"
     rospy.init_node("sub_wrench_from_slave", anonymous=True)
     for i in range(len(w_tgts)):
         rospy.Subscriber( w_tgts[i]+"sensor", WrenchStamped, callback, callback_args=i)
@@ -108,6 +112,7 @@ def callback(data, id):
     
 def sub_tf_from_slave(wl,ww):
     os.environ['ROS_MASTER_URI'] = slave_host
+    os.environ['ROS_IP'] = "192.168.96.113"
     rospy.init_node("sub_tf_from_slave", anonymous=True)
     listener = tf.TransformListener()
     rate = rospy.Rate(200)
