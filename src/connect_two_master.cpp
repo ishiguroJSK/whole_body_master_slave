@@ -93,7 +93,7 @@ void master_side_process(int argc, char** argv) {
     std::vector<geometry_msgs::WrenchStamped> tmp(ee_names.size());
     while (ros::ok()) {
         for(int i=0; i<ee_names.size(); i++){
-            ROS_INFO_STREAM_COND(loop%RATE==0, "Wrench:"<<ee_names[i]<< tmp[i] );
+	    ROS_INFO_STREAM_COND(loop%(RATE*2)==0, "Wrench:"<<ee_names[i]<< tmp[i] );
             if(tmp[i].header.stamp == shmaddr->slaveEEWrenches[i].header.stamp){ continue; } // skip if same data
             tmp[i].header.frame_id  = shmaddr->slaveEEWrenches[i].header.frame_id;
             tmp[i].header.stamp     = shmaddr->slaveEEWrenches[i].header.stamp;
@@ -159,7 +159,7 @@ void slave_side_process(int argc, char** argv) {
     std::vector<geometry_msgs::PoseStamped> tmp(tgt_names.size());
     while (ros::ok()) {
         for(int i=0; i<tgt_names.size(); i++){
-            ROS_INFO_STREAM_COND(loop%RATE==0, "Pose:"<<tgt_names[i]<< tmp[i] );
+	    ROS_INFO_STREAM_COND(loop%(RATE*2)==0, "Pose:"<<tgt_names[i]<< tmp[i] );
             if(tmp[i].header.stamp == shmaddr->masterTgtPoses[i].header.stamp){ continue; } // skip if same data
             tmp[i].header.frame_id = shmaddr->masterTgtPoses[i].header.frame_id;
             tmp[i].header.stamp    = shmaddr->masterTgtPoses[i].header.stamp;
