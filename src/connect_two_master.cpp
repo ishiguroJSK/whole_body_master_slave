@@ -78,14 +78,14 @@ void master_side_process(int argc, char** argv) {
     }
 
     for(int i=0; i<tgt_names.size(); i++){
-        std::string topic = "master_"+tgt_names[i]+"_pose_out";
+        std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
         masterTgtPoses_sub.push_back( n.subscribe<geometry_msgs::PoseStamped>(topic, 1,
             boost::bind(onMasterTgtPoseCB, _1, &shmaddr->masterTgtPoses[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
     for(int i=0; i<ee_names.size(); i++){
-        std::string topic = "slave_"+ee_names[i]+"_wrench_in";
+        std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         slaveEEWrenches_pub.push_back( n.advertise<geometry_msgs::WrenchStamped>(topic, 1));
     }
@@ -144,12 +144,12 @@ void slave_side_process(int argc, char** argv) {
     }
 
     for(int i=0; i<tgt_names.size(); i++){
-        std::string topic = "master_"+tgt_names[i]+"_pose_in";
+        std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         masterTgtPoses_pub.push_back( n.advertise<geometry_msgs::PoseStamped>(topic, 1));
     }
     for(int i=0; i<ee_names.size(); i++){
-        std::string topic = "slave_"+ee_names[i]+"_wrench_out";
+        std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
         slaveEEWrenches_sub.push_back( n.subscribe<geometry_msgs::WrenchStamped>(topic, 1,
             boost::bind(onslaveEEWrenchCB, _1, &shmaddr->slaveEEWrenches[i]),
