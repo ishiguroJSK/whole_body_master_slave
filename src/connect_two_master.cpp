@@ -214,7 +214,7 @@ int main(int argc, char** argv) {
 
     ros::init(argc, argv, "main_process_node");
     ros::NodeHandle n;
-    const int MONITOR_RATE = 30;
+    const int MONITOR_RATE = 10;
     ros::Rate rate(MONITOR_RATE);
 
     ros_shm_t* shmaddr;
@@ -238,7 +238,8 @@ int main(int argc, char** argv) {
     start_color();
     use_default_colors();
     init_pair(1, COLOR_WHITE, COLOR_GREEN);
-    init_pair(2, COLOR_WHITE, COLOR_RED);
+    init_pair(2, COLOR_WHITE, COLOR_YELLOW);
+    init_pair(3, COLOR_WHITE, COLOR_RED);
     clear();
 
     ros_shm_t prev_data = *shmaddr;
@@ -249,13 +250,11 @@ int main(int argc, char** argv) {
         for(int i=0; i<NUM_TGTS; i++){
             const int fps = (shmaddr->masterTgtPoses[i].header.seq - prev_data.masterTgtPoses[i].header.seq) * MONITOR_RATE;
             const bool is_moving = fabs(shmaddr->masterTgtPoses[i].pose.position.x != prev_data.masterTgtPoses[i].pose.position.x) > FLT_EPSILON;
-            if(is_moving){
-                attrset(COLOR_PAIR(1));
-                printw("%8s", "OK");
-            }else{
-                attrset(COLOR_PAIR(2));
-                printw("%8s", "NOT_MOVE");
+            if(fps>0){
+                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");}
             }
+            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "master_"+tgt_names[i]+"_pose";
             printw(" %-17s ",topic.c_str());
@@ -274,13 +273,11 @@ int main(int argc, char** argv) {
         for(int i=0; i<NUM_EES; i++){
             const int fps = (shmaddr->slaveEEWrenches[i].header.seq - prev_data.slaveEEWrenches[i].header.seq) * MONITOR_RATE;
             const bool is_moving = fabs(shmaddr->slaveEEWrenches[i].wrench.force.x - prev_data.slaveEEWrenches[i].wrench.force.x) > FLT_EPSILON;
-            if(is_moving){
-                attrset(COLOR_PAIR(1));
-                printw("%8s", "OK");
-            }else{
-                attrset(COLOR_PAIR(2));
-                printw("%8s", "NOT_MOVE");
+            if(fps>0){
+                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");}
             }
+            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "slave_"+ee_names[i]+"_wrench";
             printw(" %-17s ",topic.c_str());
