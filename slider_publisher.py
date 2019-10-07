@@ -106,6 +106,7 @@ if __name__ == '__main__':
   th_cl.start()
   
   app = QApplication(sys.argv)
+  signal.signal(signal.SIGINT, signal.SIG_DFL)
   mainApp = App()
   mainApp.main()
   app.exec_()
