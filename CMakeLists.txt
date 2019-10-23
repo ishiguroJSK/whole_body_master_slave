@@ -10,7 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   geometry_msgs
 )
-
+find_package(Boost REQUIRED program_options)
 find_package(Curses REQUIRED COMPONENTS)
 
 ## System dependencies are found with CMake's conventions
@@ -119,6 +119,7 @@ catkin_package(
 include_directories(
   ${catkin_INCLUDE_DIRS}
   ${CURSES_INCLUDE_DIR}
+  ${Boost_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -142,6 +143,7 @@ add_executable(connect_two_master src/connect_two_master.cpp)
 target_link_libraries(connect_two_master
   ${catkin_LIBRARIES}
   ${CURSES_LIBRARIES}
+  ${Boost_LIBRARIES}
 )
 
 #############

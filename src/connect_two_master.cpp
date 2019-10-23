@@ -5,17 +5,23 @@
 #include <sys/shm.h>
 #include <string.h>
 #include <ros/ros.h>
+#include <std_msgs/Time.h>
+#include <std_msgs/Float64.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/WrenchStamped.h>
 #include <boost/function.hpp>
 #include <ncurses.h>
+#include <boost/program_options.hpp>
 
 int shmid;
 #define NUM_EES 4
 #define NUM_TGTS 6
-const int RATE = 10000;
+const int RATE = 1000;
+const int MONITOR_RATE = 10;
 #define MAX_FRAME_ID_SIZE 1024
 std::vector<std::string> ee_names, tgt_names;
+std::string master_uri = "http://tablis:11311"; // default
+std::string slave_uri = "http://jaxonred:11311"; // default
 
 struct StaticHeader{
     char frame_id[MAX_FRAME_ID_SIZE];// header.frame_id is varid length and unsuitable for shm
@@ -35,44 +41,32 @@ struct ros_shm_t{
     StaticWrenchStamped slaveEEWrenches[NUM_EES];
     bool master_side_process_ready;
     bool slave_side_process_ready;
+    ros::Duration master_delay, slave_delay;
 };
-
-inline std::ostream& operator<<(std::ostream& os, geometry_msgs::PoseStamped& in){
-    if(in.pose.position.x==0 && in.pose.position.y==0 && in.pose.position.z==0 ){ os <<"\x1b[31m"; }//red
-    os << std::fixed << std::setprecision(2) << "= "
-        << in.pose.position.x << ", " << in.pose.position.y << ", " << in.pose.position.z << ", "
-        << in.pose.orientation.x << ", " << in.pose.orientation.y << ", " << in.pose.orientation.z << ", " << in.pose.orientation.w
-        << " [ " << in.header.seq << ": " << in.header.frame_id <<"]";
-    return os;
-}
-inline std::ostream& operator<<(std::ostream& os, geometry_msgs::WrenchStamped& in){
-    if(in.wrench.force.x==0 && in.wrench.force.y==0 && in.wrench.force.z==0 ){ os <<"\x1b[31m"; }//red
-    os << std::fixed << std::setprecision(2) << "= "
-        << in.wrench.force.x << ", " << in.wrench.force.y << ", " << in.wrench.force.z << ", "
-        << in.wrench.torque.x << ", " << in.wrench.torque.y << ", " << in.wrench.torque.z << ", "
-        << " [ " << in.header.seq << ": " << in.header.frame_id <<"]"<<"\x1b[39m";//default
-    return os;
-}
 
 void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
-    ret_ptr->header.seq = msg->header.seq;
-    ret_ptr->header.stamp = msg->header.stamp;
-    ret_ptr->pose = msg->pose;
+    ret_ptr->header.seq     = msg->header.seq;
+    ret_ptr->header.stamp   = msg->header.stamp;
+    ret_ptr->pose           = msg->pose;
+}
+
+// commonly used
+void onCalcDelayCB(const std_msgs::Time::ConstPtr& msg, ros::Duration* ret_ptr){
+    *ret_ptr = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec) - msg->data;
 }
 
 void master_side_process(int argc, char** argv) {
-    putenv("ROS_MASTER_URI=http://tablis:11311");
-    unsigned long loop = 0;
+    std::string ros_mater_uri_str = "ROS_MASTER_URI=" + master_uri;
+    putenv( const_cast<char*>(ros_mater_uri_str.c_str()));
     ros_shm_t* shmaddr;
-    ros::init(argc, argv, "master_side_process_node");
+    std::string pname = "master_side_process_node";
+    ros::init(argc, argv, pname);
     ros::NodeHandle n;
     ros::Rate rate(RATE);
-    std::string pname = "master_side";
-    ROS_INFO_STREAM(pname << " start");
-    std::vector<ros::Publisher> slaveEEWrenches_pub;
-    std::vector<ros::Subscriber> masterTgtPoses_sub;
+    ROS_INFO_STREAM(pname << " start with " << ros_mater_uri_str);
 
+    ///// get shm
     if ((shmaddr = (ros_shm_t*)shmat(shmid, NULL, 0)) == (void *) -1) {
         ROS_ERROR_STREAM(pname << " shmat error");
         exit(EXIT_FAILURE);
@@ -80,6 +74,8 @@ void master_side_process(int argc, char** argv) {
         ROS_INFO_STREAM(pname << " shmat success");
     }
 
+    ///// setup ros pub sub (both delay answer will be published in master side for compare plot)
+    std::vector<ros::Subscriber> masterTgtPoses_sub;
     for(int i=0; i<tgt_names.size(); i++){
         std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
@@ -87,59 +83,71 @@ void master_side_process(int argc, char** argv) {
             boost::bind(onMasterTgtPoseCB, _1, &shmaddr->masterTgtPoses[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
+    std::vector<ros::Publisher> slaveEEWrenches_pub;
     for(int i=0; i<ee_names.size(); i++){
         std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         slaveEEWrenches_pub.push_back( n.advertise<geometry_msgs::WrenchStamped>(topic, 1));
     }
+    ros::Publisher  master_delay_ans_pub        = n.advertise<std_msgs::Float64>("master_delay_ans",    1);
+    ros::Publisher  slave_delay_ans_pub         = n.advertise<std_msgs::Float64>("slave_delay_ans",     1);
+    ros::Publisher  delay_check_packet_pub    = n.advertise<std_msgs::Time>   ("delay_check_packet_inbound",  1);
+    ros::Subscriber delay_check_packet_sub    = n.subscribe<std_msgs::Time>   ("delay_check_packet_outbound", 1,
+                                    boost::bind(onCalcDelayCB, _1, &shmaddr->master_delay),
+                                    ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->master_side_process_ready = true;
+    ROS_INFO_STREAM(pname << " ready, enter loop");
 
-    std::vector<geometry_msgs::WrenchStamped> tmp(ee_names.size());
+    ///// main loop
+    std::vector<geometry_msgs::WrenchStamped> latest(ee_names.size());
     while (ros::ok()) {
+        ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<ee_names.size(); i++){
-//	    ROS_INFO_STREAM_COND(loop%(RATE*2)==0, "Wrench:"<<ee_names[i]<< tmp[i] );
-            if(tmp[i].header.stamp == shmaddr->slaveEEWrenches[i].header.stamp){ continue; } // skip if same data
-            tmp[i].header.frame_id  = shmaddr->slaveEEWrenches[i].header.frame_id;
-            tmp[i].header.stamp     = shmaddr->slaveEEWrenches[i].header.stamp;
-            tmp[i].header.seq       = shmaddr->slaveEEWrenches[i].header.seq;
-            tmp[i].wrench           = shmaddr->slaveEEWrenches[i].wrench;
-            slaveEEWrenches_pub[i].publish(tmp[i]);
+            if(latest[i].header.stamp == now.slaveEEWrenches[i].header.stamp){ continue; } // skip if same data
+            latest[i].header.frame_id  = now.slaveEEWrenches[i].header.frame_id;
+            latest[i].header.stamp     = now.slaveEEWrenches[i].header.stamp;
+            latest[i].header.seq       = now.slaveEEWrenches[i].header.seq;
+            latest[i].wrench           = now.slaveEEWrenches[i].wrench;
+            slaveEEWrenches_pub[i].publish(latest[i]);
         }
+        std_msgs::Float64 master_delay_ans, slave_delay_ans;
+        master_delay_ans.data = now.master_delay.toSec();
+        master_delay_ans_pub.publish(master_delay_ans);
+        slave_delay_ans.data = now.slave_delay.toSec();
+        slave_delay_ans_pub.publish(slave_delay_ans);
+        std_msgs::Time abs_time_now;
+        abs_time_now.data = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
+        delay_check_packet_pub.publish(abs_time_now);
         ros::spinOnce();
         rate.sleep();
-        loop++;
     }
 
-    if (shmdt(shmaddr) == 0) {
-        ROS_INFO("process1: shmdt success");
-    }else{
-        ROS_ERROR("process1: shmdt fail"); exit(EXIT_FAILURE);
-    }
-    ROS_INFO("process1: EXIT_SUCCESS");
+    ///// exit
+    if(shmdt(shmaddr) == 0){    ROS_INFO_STREAM(pname << " shmdt success"); }
+    else{                       ROS_ERROR_STREAM(pname << " shmdt fail"); exit(EXIT_FAILURE);}
+    ROS_INFO_STREAM(pname << " EXIT_SUCCESS");
     exit(EXIT_SUCCESS);
 }
 
 void onslaveEEWrenchCB(const geometry_msgs::WrenchStamped::ConstPtr& msg, StaticWrenchStamped* ret_ptr){
     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
-    ret_ptr->header.seq = msg->header.seq;
-    ret_ptr->header.stamp = msg->header.stamp;
-    ret_ptr->wrench = msg->wrench;
+    ret_ptr->header.seq     = msg->header.seq;
+    ret_ptr->header.stamp   = msg->header.stamp;
+    ret_ptr->wrench         = msg->wrench;
 }
 
 void slave_side_process(int argc, char** argv) {
-    putenv("ROS_MASTER_URI=http://jaxonred:11311");
-    unsigned long loop = 0;
+    std::string ros_mater_uri_str = "ROS_MASTER_URI=" + slave_uri;
+    putenv( const_cast<char*>(ros_mater_uri_str.c_str()));
     ros_shm_t* shmaddr;
-    ros::init(argc, argv, "slave_side_process_node");
+    std::string pname = "slave_side_process_node";
+    ros::init(argc, argv, pname);
     ros::NodeHandle n;
     ros::Rate rate(RATE);
-    std::string pname = "slave_side";
-    ROS_INFO_STREAM(pname << " start");
-    std::vector<ros::Publisher> masterTgtPoses_pub;
-    std::vector<ros::Subscriber> slaveEEWrenches_sub;
+    sleep(1); // ??????????????????
+    ROS_INFO_STREAM(pname << " start with " << ros_mater_uri_str);
 
-    sleep(1);
-
+    ///// get shm
     if ((shmaddr = (ros_shm_t*)shmat(shmid, NULL, 0)) == (void *) -1) {
         ROS_ERROR_STREAM(pname << " shmat error");
         exit(EXIT_FAILURE);
@@ -147,11 +155,14 @@ void slave_side_process(int argc, char** argv) {
         ROS_INFO_STREAM(pname << " shmat success");
     }
 
+    ///// setup ros pub sub
+    std::vector<ros::Publisher> masterTgtPoses_pub;
     for(int i=0; i<tgt_names.size(); i++){
         std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         masterTgtPoses_pub.push_back( n.advertise<geometry_msgs::PoseStamped>(topic, 1));
     }
+    std::vector<ros::Subscriber> slaveEEWrenches_sub;
     for(int i=0; i<ee_names.size(); i++){
         std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
@@ -159,38 +170,41 @@ void slave_side_process(int argc, char** argv) {
             boost::bind(onslaveEEWrenchCB, _1, &shmaddr->slaveEEWrenches[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
+    ros::Publisher  delay_check_packet_pub = n.advertise<std_msgs::Time>("delay_check_packet_inbound", 1);
+    ros::Subscriber delay_check_packet_sub = n.subscribe<std_msgs::Time>("delay_check_packet_outbound", 1,
+                                boost::bind(onCalcDelayCB, _1, &shmaddr->slave_delay),
+                                ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->slave_side_process_ready = true;
+    ROS_INFO_STREAM(pname << " ready, enter loop");
 
-    std::vector<geometry_msgs::PoseStamped> tmp(tgt_names.size());
+    ///// main loop
+    std::vector<geometry_msgs::PoseStamped> latest(tgt_names.size());
     while (ros::ok()) {
+        ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<tgt_names.size(); i++){
-//	    ROS_INFO_STREAM_COND(loop%(RATE*2)==0, "Pose:"<<tgt_names[i]<< tmp[i] );
-            if(tmp[i].header.stamp == shmaddr->masterTgtPoses[i].header.stamp){ continue; } // skip if same data
-            tmp[i].header.frame_id = shmaddr->masterTgtPoses[i].header.frame_id;
-            tmp[i].header.stamp    = shmaddr->masterTgtPoses[i].header.stamp;
-            tmp[i].header.seq      = shmaddr->masterTgtPoses[i].header.seq;
-            tmp[i].pose            = shmaddr->masterTgtPoses[i].pose;
-            masterTgtPoses_pub[i].publish(tmp[i]);
+            if(latest[i].header.stamp == now.masterTgtPoses[i].header.stamp){ continue; } // skip if same data
+            latest[i].header.frame_id  = now.masterTgtPoses[i].header.frame_id;
+            latest[i].header.stamp     = now.masterTgtPoses[i].header.stamp;
+            latest[i].header.seq       = now.masterTgtPoses[i].header.seq;
+            latest[i].pose             = now.masterTgtPoses[i].pose;
+            masterTgtPoses_pub[i].publish(latest[i]);
         }
+        std_msgs::Time abs_time_now;
+        abs_time_now.data = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
+        delay_check_packet_pub.publish(abs_time_now);
         ros::spinOnce();
         rate.sleep();
-        loop++;
     }
 
-    if (shmdt(shmaddr) == 0) {
-        ROS_INFO_STREAM(pname << " shmdt success");
-    }else{
-        ROS_ERROR_STREAM(pname << " shmdt fail"); exit(EXIT_FAILURE);
-    }
+    ///// exit
+    if(shmdt(shmaddr) == 0){    ROS_INFO_STREAM(pname << " shmdt success"); }
+    else{                       ROS_ERROR_STREAM(pname << " shmdt fail"); exit(EXIT_FAILURE);}
     ROS_INFO_STREAM(pname << " EXIT_SUCCESS");
     exit(EXIT_SUCCESS);
 }
 
-
-
 int main(int argc, char** argv) {
     int child_cnt;
-
     ee_names.push_back("lleg");
     ee_names.push_back("rleg");
     ee_names.push_back("larm");
@@ -198,10 +212,10 @@ int main(int argc, char** argv) {
     tgt_names = ee_names;
     tgt_names.push_back("com");
     tgt_names.push_back("head");
-
     assert(ee_names.size()  == NUM_EES);
     assert(tgt_names.size() == NUM_TGTS);
 
+    ///// create shm
     if ((shmid = shmget(IPC_PRIVATE, sizeof(ros_shm_t), 0600)) == -1) {
         ROS_ERROR("shmget error");
         exit(EXIT_FAILURE);
@@ -209,31 +223,47 @@ int main(int argc, char** argv) {
         ROS_INFO("shmget success");
     }
 
+    ///// parse options
+    boost::program_options::options_description op("target_uri_info");
+    op.add_options()
+            ("help,h",                                                      "show help.")
+            ("master_uri,m",boost::program_options::value<std::string>(),   "master hostname or ip.")
+            ("slave_uri,s", boost::program_options::value<std::string>(),   "slave hostname or ip.");
+    boost::program_options::variables_map argmap;
+    boost::program_options::store(boost::program_options::parse_command_line(argc, argv, op), argmap);
+    boost::program_options::notify(argmap);
+    if( argmap.count("help") ){         std::cerr << op << std::endl; return 1; }
+    if( argmap.count("master_uri") ){   master_uri  = argmap["master_uri"].as<std::string>();   }
+    if( argmap.count("slave_uri") ){    slave_uri   = argmap["slave_uri"].as<std::string>();    }
+    std::cerr << "master_uri is set as = "  << master_uri   << std::endl;
+    std::cerr << "slave_uri is set as = "   << slave_uri    << std::endl;
+
+    ///// start fork
     if(fork() == 0){ master_side_process(argc, argv); }
     if(fork() == 0){ slave_side_process(argc, argv); }
 
+    ///// below is main draw process
     ros::init(argc, argv, "main_process_node");
     ros::NodeHandle n;
-    const int MONITOR_RATE = 10;
     ros::Rate rate(MONITOR_RATE);
 
+    ///// get shm
     ros_shm_t* shmaddr;
     if ((shmaddr = (ros_shm_t*)shmat(shmid, NULL, 0)) == (void *) -1) {
-        std::cerr << " shmat error"<< std::endl;
-        exit(EXIT_FAILURE);
+        std::cerr << " shmat error"<< std::endl; exit(EXIT_FAILURE);
     }else{
         std::cerr << " shmat success"<< std::endl;
     }
+    ///// wait for both child process
     while(ros::ok()){
         if(shmaddr->master_side_process_ready && shmaddr->slave_side_process_ready){
-            ROS_INFO("both process ready, enter ncurses");
-            break;
+            ROS_INFO("both process ready, enter ncurses"); break;
         }else{
-            ROS_WARN("wait for both process ready");
-            sleep(1);
+            ROS_WARN("wait for both process ready"); sleep(1);
         }
     }
 
+    ///// setup ncurses
     initscr();
     start_color();
     use_default_colors();
@@ -242,71 +272,75 @@ int main(int argc, char** argv) {
     init_pair(3, COLOR_WHITE, COLOR_RED);
     clear();
 
+    ///// main loop
     ros_shm_t prev_data = *shmaddr;
-    while(ros::ok()){
+    for(unsigned int draw_cnt = 0, line = 1; ros::ok(); line = 1, draw_cnt++){
+        ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         erase();
-        int line=0;
 
+        ///// draw common info
+        printw("Drawn frame count %d", draw_cnt);
+        move(line++, 0);
+        printw("Master side communication delay %8.3f [ms]", now.master_delay.toSec() * 1e3);
+        move(line++, 0);
+        printw("Slave  side communication delay %8.3f [ms]", now.slave_delay.toSec() * 1e3);
+        move(line++, 0);
+
+        ///// draw master side info
         for(int i=0; i<NUM_TGTS; i++){
-            const int fps = (shmaddr->masterTgtPoses[i].header.seq - prev_data.masterTgtPoses[i].header.seq) * MONITOR_RATE;
-            const bool is_moving = fabs(shmaddr->masterTgtPoses[i].pose.position.x != prev_data.masterTgtPoses[i].pose.position.x) > FLT_EPSILON;
+            const int fps = (now.masterTgtPoses[i].header.seq - prev_data.masterTgtPoses[i].header.seq) * MONITOR_RATE;
+            const bool is_moving = fabs(now.masterTgtPoses[i].pose.position.x != prev_data.masterTgtPoses[i].pose.position.x) > FLT_EPSILON;
             if(fps>0){
                 if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
-                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");}
-            }
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "master_"+tgt_names[i]+"_pose";
             printw(" %-17s ",topic.c_str());
-            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", shmaddr->masterTgtPoses[i].header.seq, fps,
-                shmaddr->masterTgtPoses[i].pose.position.x,
-                shmaddr->masterTgtPoses[i].pose.position.y,
-                shmaddr->masterTgtPoses[i].pose.position.z,
-                shmaddr->masterTgtPoses[i].pose.orientation.x,
-                shmaddr->masterTgtPoses[i].pose.orientation.y,
-                shmaddr->masterTgtPoses[i].pose.orientation.z,
-                shmaddr->masterTgtPoses[i].pose.orientation.w
+            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.masterTgtPoses[i].header.seq, fps,
+                now.masterTgtPoses[i].pose.position.x,
+                now.masterTgtPoses[i].pose.position.y,
+                now.masterTgtPoses[i].pose.position.z,
+                now.masterTgtPoses[i].pose.orientation.x,
+                now.masterTgtPoses[i].pose.orientation.y,
+                now.masterTgtPoses[i].pose.orientation.z,
+                now.masterTgtPoses[i].pose.orientation.w
                 );
             move(line++, 0);
         }
 
+        ///// draw slave side info
         for(int i=0; i<NUM_EES; i++){
-            const int fps = (shmaddr->slaveEEWrenches[i].header.seq - prev_data.slaveEEWrenches[i].header.seq) * MONITOR_RATE;
-            const bool is_moving = fabs(shmaddr->slaveEEWrenches[i].wrench.force.x - prev_data.slaveEEWrenches[i].wrench.force.x) > FLT_EPSILON;
+            const int fps = (now.slaveEEWrenches[i].header.seq - prev_data.slaveEEWrenches[i].header.seq) * MONITOR_RATE;
+            const bool is_moving = fabs(now.slaveEEWrenches[i].wrench.force.x - prev_data.slaveEEWrenches[i].wrench.force.x) > FLT_EPSILON;
             if(fps>0){
                 if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
-                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");}
-            }
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "slave_"+ee_names[i]+"_wrench";
             printw(" %-17s ",topic.c_str());
-            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", shmaddr->slaveEEWrenches[i].header.seq, fps,
-                shmaddr->slaveEEWrenches[i].wrench.force.x,
-                shmaddr->slaveEEWrenches[i].wrench.force.y,
-                shmaddr->slaveEEWrenches[i].wrench.force.z,
-                shmaddr->slaveEEWrenches[i].wrench.torque.x,
-                shmaddr->slaveEEWrenches[i].wrench.torque.y,
-                shmaddr->slaveEEWrenches[i].wrench.torque.z
+            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveEEWrenches[i].header.seq, fps,
+                now.slaveEEWrenches[i].wrench.force.x,
+                now.slaveEEWrenches[i].wrench.force.y,
+                now.slaveEEWrenches[i].wrench.force.z,
+                now.slaveEEWrenches[i].wrench.torque.x,
+                now.slaveEEWrenches[i].wrench.torque.y,
+                now.slaveEEWrenches[i].wrench.torque.z
                 );
             move(line++, 0);
         }
 
-        prev_data = *shmaddr;
+        prev_data = now;
         refresh();
         rate.sleep();
     }
-    endwin();
 
-    for (child_cnt = 0; child_cnt < 2; ++child_cnt) {
-        wait(NULL);
-    }
-    if (shmctl(shmid, IPC_RMID, NULL) == -1) {
-        ROS_ERROR("shmid error");
-        exit(EXIT_FAILURE);
-    }{
-        ROS_INFO("shmid success");
-    }
+    ///// exit
+    endwin();
+    for (child_cnt = 0; child_cnt < 2; ++child_cnt) { wait(NULL); }
+    if (shmctl(shmid, IPC_RMID, NULL) == -1) { ROS_ERROR("shmid error"); exit(EXIT_FAILURE); }
+    else { ROS_INFO("shmid success"); }
     ROS_INFO("EXIT_SUCCESS");
     return EXIT_SUCCESS;
 }
