@@ -42,6 +42,7 @@ struct ros_shm_t{
     bool master_side_process_ready;
     bool slave_side_process_ready;
     ros::Duration master_delay, slave_delay;
+    ros::Time master_rcv_time, master_now_time, slave_rcv_time, slave_now_time;
 };
 
 void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
@@ -51,9 +52,16 @@ void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPo
     ret_ptr->pose           = msg->pose;
 }
 
-// commonly used
-void onCalcDelayCB(const std_msgs::Time::ConstPtr& msg, ros::Duration* ret_ptr){
-    *ret_ptr = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec) - msg->data;
+void onMasterDelayCheckPacketCB(const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){
+    ret_ptr->master_now_time = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
+    ret_ptr->master_rcv_time = msg->data;
+    ret_ptr->master_delay = ret_ptr->master_now_time - ret_ptr->master_rcv_time;
+}
+
+void onSlaveDelayCheckPacketCB(const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){
+    ret_ptr->slave_now_time = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
+    ret_ptr->slave_rcv_time = msg->data;
+    ret_ptr->slave_delay = ret_ptr->slave_now_time - ret_ptr->slave_rcv_time;
 }
 
 void master_side_process(int argc, char** argv) {
@@ -93,7 +101,7 @@ void master_side_process(int argc, char** argv) {
     ros::Publisher  slave_delay_ans_pub         = n.advertise<std_msgs::Float64>("slave_delay_ans",     1);
     ros::Publisher  delay_check_packet_pub    = n.advertise<std_msgs::Time>   ("delay_check_packet_inbound",  1);
     ros::Subscriber delay_check_packet_sub    = n.subscribe<std_msgs::Time>   ("delay_check_packet_outbound", 1,
-                                    boost::bind(onCalcDelayCB, _1, &shmaddr->master_delay),
+                                    boost::bind(onMasterDelayCheckPacketCB, _1, shmaddr),
                                     ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->master_side_process_ready = true;
     ROS_INFO_STREAM(pname << " ready, enter loop");
@@ -172,7 +180,7 @@ void slave_side_process(int argc, char** argv) {
     }
     ros::Publisher  delay_check_packet_pub = n.advertise<std_msgs::Time>("delay_check_packet_inbound", 1);
     ros::Subscriber delay_check_packet_sub = n.subscribe<std_msgs::Time>("delay_check_packet_outbound", 1,
-                                boost::bind(onCalcDelayCB, _1, &shmaddr->slave_delay),
+                                boost::bind(onSlaveDelayCheckPacketCB, _1, shmaddr),
                                 ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->slave_side_process_ready = true;
     ROS_INFO_STREAM(pname << " ready, enter loop");
@@ -281,9 +289,11 @@ int main(int argc, char** argv) {
         ///// draw common info
         printw("Drawn frame count %d", draw_cnt);
         move(line++, 0);
-        printw("Master side communication delay %8.3f [ms]", now.master_delay.toSec() * 1e3);
+        printw("Master side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
+            now.master_delay.toSec()*1e3, now.master_now_time.toSec(), now.master_rcv_time.toSec());
         move(line++, 0);
-        printw("Slave  side communication delay %8.3f [ms]", now.slave_delay.toSec() * 1e3);
+        printw("Slave  side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
+            now.slave_delay.toSec()*1e3, now.slave_now_time.toSec(), now.slave_rcv_time.toSec());
         move(line++, 0);
 
         ///// draw master side info
