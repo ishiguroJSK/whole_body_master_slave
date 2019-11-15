@@ -15,7 +15,7 @@
 
 int shmid;
 #define NUM_EES 4
-#define NUM_TGTS 6
+#define NUM_TGTS 8
 const int RATE = 1000;
 const int MONITOR_RATE = 10;
 #define MAX_FRAME_ID_SIZE 1024
@@ -42,7 +42,7 @@ struct ros_shm_t{
     bool master_side_process_ready;
     bool slave_side_process_ready;
     ros::Duration master_delay, slave_delay;
-    ros::Time master_rcv_time, master_now_time, slave_rcv_time, slave_now_time;
+    ros::Time master_rcv_time, slave_rcv_time;
 };
 
 void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
@@ -52,17 +52,8 @@ void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPo
     ret_ptr->pose           = msg->pose;
 }
 
-void onMasterDelayCheckPacketCB(const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){
-    ret_ptr->master_now_time = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
-    ret_ptr->master_rcv_time = msg->data;
-    ret_ptr->master_delay = ret_ptr->master_now_time - ret_ptr->master_rcv_time;
-}
-
-void onSlaveDelayCheckPacketCB(const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){
-    ret_ptr->slave_now_time = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
-    ret_ptr->slave_rcv_time = msg->data;
-    ret_ptr->slave_delay = ret_ptr->slave_now_time - ret_ptr->slave_rcv_time;
-}
+void onMasterDelayCheckPacketCB (const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){  ret_ptr->master_rcv_time = msg->data;}
+void onSlaveDelayCheckPacketCB  (const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){  ret_ptr->slave_rcv_time  = msg->data;}
 
 void master_side_process(int argc, char** argv) {
     std::string ros_mater_uri_str = "ROS_MASTER_URI=" + master_uri;
@@ -118,11 +109,16 @@ void master_side_process(int argc, char** argv) {
             latest[i].wrench           = now.slaveEEWrenches[i].wrench;
             slaveEEWrenches_pub[i].publish(latest[i]);
         }
+        ////////////// calc and pub delay answer
+        ros::Time ros_time_now  = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
         std_msgs::Float64 master_delay_ans, slave_delay_ans;
-        master_delay_ans.data = now.master_delay.toSec();
+        shmaddr->master_delay   = ros_time_now - now.master_rcv_time;
+        shmaddr->slave_delay    = ros_time_now - now.slave_rcv_time;
+        master_delay_ans.data   = shmaddr->master_delay.toSec();
+        slave_delay_ans.data    = shmaddr->slave_delay.toSec();
         master_delay_ans_pub.publish(master_delay_ans);
-        slave_delay_ans.data = now.slave_delay.toSec();
         slave_delay_ans_pub.publish(slave_delay_ans);
+        ////////////// send timestamp for delay calc
         std_msgs::Time abs_time_now;
         abs_time_now.data = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
         delay_check_packet_pub.publish(abs_time_now);
@@ -198,6 +194,7 @@ void slave_side_process(int argc, char** argv) {
             latest[i].pose             = now.masterTgtPoses[i].pose;
             masterTgtPoses_pub[i].publish(latest[i]);
         }
+        ////////////// send timestamp for delay calc
         std_msgs::Time abs_time_now;
         abs_time_now.data = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
         delay_check_packet_pub.publish(abs_time_now);
@@ -221,6 +218,8 @@ int main(int argc, char** argv) {
     tgt_names = ee_names;
     tgt_names.push_back("com");
     tgt_names.push_back("head");
+    tgt_names.push_back("lhand");
+    tgt_names.push_back("rhand");
     assert(ee_names.size()  == NUM_EES);
     assert(tgt_names.size() == NUM_TGTS);
 
@@ -285,18 +284,19 @@ int main(int argc, char** argv) {
     ros_shm_t prev_data = *shmaddr;
     for(unsigned int draw_cnt = 0, line = 1; ros::ok(); line = 1, draw_cnt++){
         ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
+        ros::Time ros_time_now = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
         erase();
 
         ///// draw common info
         printw("Drawn frame count %d", draw_cnt);
         move(line++, 0);
         printw("Master side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
-            now.master_delay.toSec()*1e3, now.master_now_time.toSec(), now.master_rcv_time.toSec());
+            now.master_delay.toSec()*1e3, ros_time_now.toSec(), now.master_rcv_time.toSec());
         move(line++, 0);
         printw("Slave  side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
-            now.slave_delay.toSec()*1e3, now.slave_now_time.toSec(), now.slave_rcv_time.toSec());
+            now.slave_delay.toSec()*1e3, ros_time_now.toSec(), now.slave_rcv_time.toSec());
         move(line++, 0);
-        printw("=============================================================================================");
+        printw("=============================================================================================================================");
         move(line++, 0);
 
         ///// draw master side info
@@ -321,7 +321,7 @@ int main(int argc, char** argv) {
                 );
             move(line++, 0);
         }
-        printw("=============================================================================================");
+        printw("=============================================================================================================================");
         move(line++, 0);
 
         ///// draw slave side info
