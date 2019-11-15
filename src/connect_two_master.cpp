@@ -191,6 +191,7 @@ void slave_side_process(int argc, char** argv) {
         ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<tgt_names.size(); i++){
             if(latest[i].header.stamp == now.masterTgtPoses[i].header.stamp){ continue; } // skip if same data
+	    if(tgt_names[i] == "head"){ continue; }// ignore master side head data
             latest[i].header.frame_id  = now.masterTgtPoses[i].header.frame_id;
             latest[i].header.stamp     = now.masterTgtPoses[i].header.stamp;
             latest[i].header.seq       = now.masterTgtPoses[i].header.seq;
@@ -295,6 +296,8 @@ int main(int argc, char** argv) {
         printw("Slave  side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
             now.slave_delay.toSec()*1e3, now.slave_now_time.toSec(), now.slave_rcv_time.toSec());
         move(line++, 0);
+        printw("=============================================================================================");
+        move(line++, 0);
 
         ///// draw master side info
         for(int i=0; i<NUM_TGTS; i++){
@@ -318,6 +321,8 @@ int main(int argc, char** argv) {
                 );
             move(line++, 0);
         }
+        printw("=============================================================================================");
+        move(line++, 0);
 
         ///// draw slave side info
         for(int i=0; i<NUM_EES; i++){
