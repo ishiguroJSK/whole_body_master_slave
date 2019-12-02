@@ -12,7 +12,7 @@ if __name__ == '__main__':
     listener = tf.TransformListener()
 
     tgts = ["com","lf","rf","lh","rh","head"]
-    pubs = [rospy.Publisher("/human_tracker_"+tgt+"_ref", PoseStamped, queue_size=10) for tgt in tgts]
+    pubs = [rospy.Publisher("/master_"+tgt+"_pose", PoseStamped, queue_size=10) for tgt in tgts]
     vals = [PoseStamped() for i in range(0, len(tgts))]
 
     rate = rospy.Rate(200.0)
