@@ -14,12 +14,11 @@ if __name__ == '__main__':
     tgts = ["com","lf","rf","lh","rh","head"]
     pubs = [rospy.Publisher("/master_"+tgt+"_pose", PoseStamped, queue_size=10) for tgt in tgts]
     vals = [PoseStamped() for i in range(0, len(tgts))]
-
     rate = rospy.Rate(200.0)
     while not rospy.is_shutdown():
         tm_start = time.time()
         infostr = ""
-        for i in range(0,len(tgts)):
+        for i in range(len(tgts)):
             try:
                 (pos, rot) = listener.lookupTransform("/operator_origin", "/vive_"+tgts[i]+"_tf", rospy.Time(0))
             except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
