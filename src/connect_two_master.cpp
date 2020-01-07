@@ -385,7 +385,7 @@ int main(int argc, char** argv) {
                 else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
-            std::string topic = "slave_"+ee_names[i]+"_wrench";
+            std::string topic = "master_"+ee_names[i]+"_wrench";
             printw(" %-17s ",topic.c_str());
             printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.masterEEWrenches[i].header.seq, fps,
                 now.masterEEWrenches[i].wrench.force.x,
@@ -401,6 +401,29 @@ int main(int argc, char** argv) {
         move(line++, 0);
 
         ///// draw slave side info
+        for(int i=0; i<NUM_TGTS; i++){
+            const int fps = (now.slaveTgtPoses[i].header.seq - prev_data.slaveTgtPoses[i].header.seq) * MONITOR_RATE;
+            const bool is_moving = fabs(now.slaveTgtPoses[i].pose.position.x != prev_data.slaveTgtPoses[i].pose.position.x) > FLT_EPSILON;
+            if(fps>0){
+                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
+            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
+            attrset(0);
+            std::string topic = "slave_"+tgt_names[i]+"_pose";
+            printw(" %-17s ",topic.c_str());
+            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveTgtPoses[i].header.seq, fps,
+                now.slaveTgtPoses[i].pose.position.x,
+                now.slaveTgtPoses[i].pose.position.y,
+                now.slaveTgtPoses[i].pose.position.z,
+                now.slaveTgtPoses[i].pose.orientation.x,
+                now.slaveTgtPoses[i].pose.orientation.y,
+                now.slaveTgtPoses[i].pose.orientation.z,
+                now.slaveTgtPoses[i].pose.orientation.w
+                );
+            move(line++, 0);
+        }
+        printw("-----------------------------------------------------------------------------------------------------------------------------");
+        move(line++, 0);
         for(int i=0; i<NUM_EES; i++){
             const int fps = (now.slaveEEWrenches[i].header.seq - prev_data.slaveEEWrenches[i].header.seq) * MONITOR_RATE;
             const bool is_moving = fabs(now.slaveEEWrenches[i].wrench.force.x - prev_data.slaveEEWrenches[i].wrench.force.x) > FLT_EPSILON;
@@ -418,29 +441,6 @@ int main(int argc, char** argv) {
                 now.slaveEEWrenches[i].wrench.torque.x,
                 now.slaveEEWrenches[i].wrench.torque.y,
                 now.slaveEEWrenches[i].wrench.torque.z
-                );
-            move(line++, 0);
-        }
-        printw("-----------------------------------------------------------------------------------------------------------------------------");
-        move(line++, 0);
-        for(int i=0; i<NUM_TGTS; i++){
-            const int fps = (now.slaveTgtPoses[i].header.seq - prev_data.slaveTgtPoses[i].header.seq) * MONITOR_RATE;
-            const bool is_moving = fabs(now.slaveTgtPoses[i].pose.position.x != prev_data.slaveTgtPoses[i].pose.position.x) > FLT_EPSILON;
-            if(fps>0){
-                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
-                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
-            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
-            attrset(0);
-            std::string topic = "master_"+tgt_names[i]+"_pose";
-            printw(" %-17s ",topic.c_str());
-            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveTgtPoses[i].header.seq, fps,
-                now.slaveTgtPoses[i].pose.position.x,
-                now.slaveTgtPoses[i].pose.position.y,
-                now.slaveTgtPoses[i].pose.position.z,
-                now.slaveTgtPoses[i].pose.orientation.x,
-                now.slaveTgtPoses[i].pose.orientation.y,
-                now.slaveTgtPoses[i].pose.orientation.z,
-                now.slaveTgtPoses[i].pose.orientation.w
                 );
             move(line++, 0);
         }
