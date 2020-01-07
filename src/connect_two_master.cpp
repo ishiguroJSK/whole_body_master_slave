@@ -15,7 +15,7 @@
 
 int shmid;
 #define NUM_EES 4
-#define NUM_TGTS 8
+#define NUM_TGTS 10
 const int RATE = 1000;
 const int MONITOR_RATE = 10;
 #define MAX_FRAME_ID_SIZE 1024
@@ -23,33 +23,47 @@ std::vector<std::string> ee_names, tgt_names;
 std::string master_uri = "http://tablis:11311"; // default
 std::string slave_uri = "http://jaxonred:11311"; // default
 
-struct StaticHeader{
+struct StaticSizedHeader{
     char frame_id[MAX_FRAME_ID_SIZE];// header.frame_id is varid length and unsuitable for shm
     uint32_t seq;
     ros::Time stamp;
 };
-struct StaticPoseStamed{
-    StaticHeader header;
+struct StaticSizedPoseStamed{
+    StaticSizedHeader header;
     geometry_msgs::Pose pose;
 };
-struct StaticWrenchStamped{
-    StaticHeader header;
+struct StaticSizedWrenchStamped{
+    StaticSizedHeader header;
     geometry_msgs::Wrench wrench;
 };
 struct ros_shm_t{
-    StaticPoseStamed masterTgtPoses[NUM_TGTS];
-    StaticWrenchStamped slaveEEWrenches[NUM_EES];
+    StaticSizedPoseStamed masterTgtPoses[NUM_TGTS];
+    StaticSizedPoseStamed slaveTgtPoses[NUM_TGTS];
+    StaticSizedWrenchStamped masterEEWrenches[NUM_EES];
+    StaticSizedWrenchStamped slaveEEWrenches[NUM_EES];
     bool master_side_process_ready;
     bool slave_side_process_ready;
     ros::Duration master_delay, slave_delay;
     ros::Time master_rcv_time, slave_rcv_time;
 };
 
-void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
+// void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
+//     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
+//     ret_ptr->header.seq     = msg->header.seq;
+//     ret_ptr->header.stamp   = msg->header.stamp;
+//     ret_ptr->pose           = msg->pose;
+// }
+void onTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticSizedPoseStamed* ret_ptr){
     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
     ret_ptr->header.seq     = msg->header.seq;
     ret_ptr->header.stamp   = msg->header.stamp;
     ret_ptr->pose           = msg->pose;
+}
+void onEEWrenchCB(const geometry_msgs::WrenchStamped::ConstPtr& msg, StaticSizedWrenchStamped* ret_ptr){
+    msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
+    ret_ptr->header.seq     = msg->header.seq;
+    ret_ptr->header.stamp   = msg->header.stamp;
+    ret_ptr->wrench         = msg->wrench;
 }
 
 void onMasterDelayCheckPacketCB (const std_msgs::Time::ConstPtr& msg, ros_shm_t* ret_ptr){  ret_ptr->master_rcv_time = msg->data;}
@@ -74,40 +88,63 @@ void master_side_process(int argc, char** argv) {
     }
 
     ///// setup ros pub sub (both delay answer will be published in master side for compare plot)
-    std::vector<ros::Subscriber> masterTgtPoses_sub;
+    std::vector<ros::Subscriber> masterTgtPoses_sub, masterEEWrenches_sub;
+    std::vector<ros::Publisher> slaveEEWrenches_pub, slaveTgtPoses_pub;
     for(int i=0; i<tgt_names.size(); i++){
         std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
         masterTgtPoses_sub.push_back( n.subscribe<geometry_msgs::PoseStamped>(topic, 1,
-            boost::bind(onMasterTgtPoseCB, _1, &shmaddr->masterTgtPoses[i]),
+            boost::bind(onTgtPoseCB, _1, &shmaddr->masterTgtPoses[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
-    std::vector<ros::Publisher> slaveEEWrenches_pub;
+    for(int i=0; i<ee_names.size(); i++){
+        std::string topic = "master_"+ee_names[i]+"_wrench";
+        ROS_INFO_STREAM(pname << " register subscriber " << topic);
+        masterEEWrenches_sub.push_back( n.subscribe<geometry_msgs::WrenchStamped>(topic, 1,
+            boost::bind(onEEWrenchCB, _1, &shmaddr->masterEEWrenches[i]),
+            ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
+    }
     for(int i=0; i<ee_names.size(); i++){
         std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         slaveEEWrenches_pub.push_back( n.advertise<geometry_msgs::WrenchStamped>(topic, 1));
     }
-    ros::Publisher  master_delay_ans_pub        = n.advertise<std_msgs::Float64>("master_delay_ans",    1);
-    ros::Publisher  slave_delay_ans_pub         = n.advertise<std_msgs::Float64>("slave_delay_ans",     1);
-    ros::Publisher  delay_check_packet_pub    = n.advertise<std_msgs::Time>   ("delay_check_packet_inbound",  1);
-    ros::Subscriber delay_check_packet_sub    = n.subscribe<std_msgs::Time>   ("delay_check_packet_outbound", 1,
+    for(int i=0; i<tgt_names.size(); i++){
+        std::string topic = "slave_"+tgt_names[i]+"_pose";
+        ROS_INFO_STREAM(pname << " register publisher " << topic);
+        slaveTgtPoses_pub.push_back( n.advertise<geometry_msgs::PoseStamped>(topic, 1));
+    }
+    ros::Publisher  master_delay_ans_pub    = n.advertise<std_msgs::Float64>("master_delay_ans",    1);
+    ros::Publisher  slave_delay_ans_pub     = n.advertise<std_msgs::Float64>("slave_delay_ans",     1);
+    ros::Publisher  delay_check_packet_pub  = n.advertise<std_msgs::Time>   ("delay_check_packet_inbound",  1);
+    ros::Subscriber delay_check_packet_sub  = n.subscribe<std_msgs::Time>   ("delay_check_packet_outbound", 1,
                                     boost::bind(onMasterDelayCheckPacketCB, _1, shmaddr),
                                     ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->master_side_process_ready = true;
     ROS_INFO_STREAM(pname << " ready, enter loop");
 
     ///// main loop
-    std::vector<geometry_msgs::WrenchStamped> latest(ee_names.size());
+    std::vector<geometry_msgs::WrenchStamped>   latest_w(ee_names.size());
+    std::vector<geometry_msgs::PoseStamped>     latest_p(tgt_names.size());
     while (ros::ok()) {
         ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<ee_names.size(); i++){
-            if(latest[i].header.stamp == now.slaveEEWrenches[i].header.stamp){ continue; } // skip if same data
-            latest[i].header.frame_id  = now.slaveEEWrenches[i].header.frame_id;
-            latest[i].header.stamp     = now.slaveEEWrenches[i].header.stamp;
-            latest[i].header.seq       = now.slaveEEWrenches[i].header.seq;
-            latest[i].wrench           = now.slaveEEWrenches[i].wrench;
-            slaveEEWrenches_pub[i].publish(latest[i]);
+            if(now.slaveEEWrenches[i].header.stamp != latest_w[i].header.stamp){ // update only if new data
+                latest_w[i].header.frame_id  = now.slaveEEWrenches[i].header.frame_id;
+                latest_w[i].header.stamp     = now.slaveEEWrenches[i].header.stamp;
+                latest_w[i].header.seq       = now.slaveEEWrenches[i].header.seq;
+                latest_w[i].wrench           = now.slaveEEWrenches[i].wrench;
+                slaveEEWrenches_pub[i].publish(latest_w[i]);
+            }
+        }
+        for(int i=0; i<tgt_names.size(); i++){
+            if(now.slaveTgtPoses[i].header.stamp != latest_p[i].header.stamp){ // update only if new data
+                latest_p[i].header.frame_id  = now.slaveTgtPoses[i].header.frame_id;
+                latest_p[i].header.stamp     = now.slaveTgtPoses[i].header.stamp;
+                latest_p[i].header.seq       = now.slaveTgtPoses[i].header.seq;
+                latest_p[i].pose             = now.slaveTgtPoses[i].pose;
+                slaveTgtPoses_pub[i].publish(latest_p[i]);
+            }
         }
         ////////////// calc and pub delay answer
         ros::Time ros_time_now  = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
@@ -133,13 +170,6 @@ void master_side_process(int argc, char** argv) {
     exit(EXIT_SUCCESS);
 }
 
-void onslaveEEWrenchCB(const geometry_msgs::WrenchStamped::ConstPtr& msg, StaticWrenchStamped* ret_ptr){
-    msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
-    ret_ptr->header.seq     = msg->header.seq;
-    ret_ptr->header.stamp   = msg->header.stamp;
-    ret_ptr->wrench         = msg->wrench;
-}
-
 void slave_side_process(int argc, char** argv) {
     std::string ros_mater_uri_str = "ROS_MASTER_URI=" + slave_uri;
     putenv( const_cast<char*>(ros_mater_uri_str.c_str()));
@@ -160,18 +190,30 @@ void slave_side_process(int argc, char** argv) {
     }
 
     ///// setup ros pub sub
-    std::vector<ros::Publisher> masterTgtPoses_pub;
+    std::vector<ros::Publisher> masterTgtPoses_pub, masterEEWrenches_pub;
+    std::vector<ros::Subscriber> slaveEEWrenches_sub, slaveTgtPoses_sub;
     for(int i=0; i<tgt_names.size(); i++){
         std::string topic = "master_"+tgt_names[i]+"_pose";
         ROS_INFO_STREAM(pname << " register publisher " << topic);
         masterTgtPoses_pub.push_back( n.advertise<geometry_msgs::PoseStamped>(topic, 1));
     }
-    std::vector<ros::Subscriber> slaveEEWrenches_sub;
+    for(int i=0; i<ee_names.size(); i++){
+        std::string topic = "master_"+ee_names[i]+"_wrench";
+        ROS_INFO_STREAM(pname << " register publisher " << topic);
+        masterEEWrenches_pub.push_back( n.advertise<geometry_msgs::WrenchStamped>(topic, 1));
+    }
     for(int i=0; i<ee_names.size(); i++){
         std::string topic = "slave_"+ee_names[i]+"_wrench";
         ROS_INFO_STREAM(pname << " register subscriber " << topic);
         slaveEEWrenches_sub.push_back( n.subscribe<geometry_msgs::WrenchStamped>(topic, 1,
-            boost::bind(onslaveEEWrenchCB, _1, &shmaddr->slaveEEWrenches[i]),
+            boost::bind(onEEWrenchCB, _1, &shmaddr->slaveEEWrenches[i]),
+            ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
+    }
+    for(int i=0; i<tgt_names.size(); i++){
+        std::string topic = "slave_"+tgt_names[i]+"_pose";
+        ROS_INFO_STREAM(pname << " register subscriber " << topic);
+        slaveTgtPoses_sub.push_back( n.subscribe<geometry_msgs::PoseStamped>(topic, 1,
+            boost::bind(onTgtPoseCB, _1, &shmaddr->slaveTgtPoses[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
     ros::Publisher  delay_check_packet_pub = n.advertise<std_msgs::Time>("delay_check_packet_inbound", 1);
@@ -182,17 +224,27 @@ void slave_side_process(int argc, char** argv) {
     ROS_INFO_STREAM(pname << " ready, enter loop");
 
     ///// main loop
-    std::vector<geometry_msgs::PoseStamped> latest(tgt_names.size());
+    std::vector<geometry_msgs::PoseStamped>     latest_p(tgt_names.size());
+    std::vector<geometry_msgs::WrenchStamped>   latest_w(ee_names.size());
     while (ros::ok()) {
         ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<tgt_names.size(); i++){
-            if(latest[i].header.stamp == now.masterTgtPoses[i].header.stamp){ continue; } // skip if same data
-	    if(tgt_names[i] == "head"){ continue; }// ignore master side head data
-            latest[i].header.frame_id  = now.masterTgtPoses[i].header.frame_id;
-            latest[i].header.stamp     = now.masterTgtPoses[i].header.stamp;
-            latest[i].header.seq       = now.masterTgtPoses[i].header.seq;
-            latest[i].pose             = now.masterTgtPoses[i].pose;
-            masterTgtPoses_pub[i].publish(latest[i]);
+            if(now.masterTgtPoses[i].header.stamp != latest_p[i].header.stamp){ // update only if new data
+                latest_p[i].header.frame_id = now.masterTgtPoses[i].header.frame_id;
+                latest_p[i].header.stamp    = now.masterTgtPoses[i].header.stamp;
+                latest_p[i].header.seq      = now.masterTgtPoses[i].header.seq;
+                latest_p[i].pose            = now.masterTgtPoses[i].pose;
+                masterTgtPoses_pub[i].publish(latest_p[i]);
+            }
+        }
+        for(int i=0; i<ee_names.size(); i++){
+            if(now.masterTgtPoses[i].header.stamp != latest_w[i].header.stamp){ // update only if new data
+                latest_w[i].header.frame_id = now.masterEEWrenches[i].header.frame_id;
+                latest_w[i].header.stamp    = now.masterEEWrenches[i].header.stamp;
+                latest_w[i].header.seq      = now.masterEEWrenches[i].header.seq;
+                latest_w[i].wrench          = now.masterEEWrenches[i].wrench;
+                masterEEWrenches_pub[i].publish(latest_w[i]);
+            }
         }
         ////////////// send timestamp for delay calc
         std_msgs::Time abs_time_now;
@@ -220,6 +272,8 @@ int main(int argc, char** argv) {
     tgt_names.push_back("head");
     tgt_names.push_back("lhand");
     tgt_names.push_back("rhand");
+    tgt_names.push_back("lfloor");
+    tgt_names.push_back("rfloor");
     assert(ee_names.size()  == NUM_EES);
     assert(tgt_names.size() == NUM_TGTS);
 
@@ -321,6 +375,28 @@ int main(int argc, char** argv) {
                 );
             move(line++, 0);
         }
+        printw("-----------------------------------------------------------------------------------------------------------------------------");
+        move(line++, 0);
+        for(int i=0; i<NUM_EES; i++){
+            const int fps = (now.masterEEWrenches[i].header.seq - prev_data.masterEEWrenches[i].header.seq) * MONITOR_RATE;
+            const bool is_moving = fabs(now.masterEEWrenches[i].wrench.force.x - prev_data.masterEEWrenches[i].wrench.force.x) > FLT_EPSILON;
+            if(fps>0){
+                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
+            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
+            attrset(0);
+            std::string topic = "slave_"+ee_names[i]+"_wrench";
+            printw(" %-17s ",topic.c_str());
+            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.masterEEWrenches[i].header.seq, fps,
+                now.masterEEWrenches[i].wrench.force.x,
+                now.masterEEWrenches[i].wrench.force.y,
+                now.masterEEWrenches[i].wrench.force.z,
+                now.masterEEWrenches[i].wrench.torque.x,
+                now.masterEEWrenches[i].wrench.torque.y,
+                now.masterEEWrenches[i].wrench.torque.z
+                );
+            move(line++, 0);
+        }
         printw("=============================================================================================================================");
         move(line++, 0);
 
@@ -342,6 +418,29 @@ int main(int argc, char** argv) {
                 now.slaveEEWrenches[i].wrench.torque.x,
                 now.slaveEEWrenches[i].wrench.torque.y,
                 now.slaveEEWrenches[i].wrench.torque.z
+                );
+            move(line++, 0);
+        }
+        printw("-----------------------------------------------------------------------------------------------------------------------------");
+        move(line++, 0);
+        for(int i=0; i<NUM_TGTS; i++){
+            const int fps = (now.slaveTgtPoses[i].header.seq - prev_data.slaveTgtPoses[i].header.seq) * MONITOR_RATE;
+            const bool is_moving = fabs(now.slaveTgtPoses[i].pose.position.x != prev_data.slaveTgtPoses[i].pose.position.x) > FLT_EPSILON;
+            if(fps>0){
+                if(is_moving){  attrset(COLOR_PAIR(1)); printw("%8s", "OK");}
+                else{           attrset(COLOR_PAIR(2)); printw("%8s", "NOT_MOVE");} }
+            else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
+            attrset(0);
+            std::string topic = "master_"+tgt_names[i]+"_pose";
+            printw(" %-17s ",topic.c_str());
+            printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveTgtPoses[i].header.seq, fps,
+                now.slaveTgtPoses[i].pose.position.x,
+                now.slaveTgtPoses[i].pose.position.y,
+                now.slaveTgtPoses[i].pose.position.z,
+                now.slaveTgtPoses[i].pose.orientation.x,
+                now.slaveTgtPoses[i].pose.orientation.y,
+                now.slaveTgtPoses[i].pose.orientation.z,
+                now.slaveTgtPoses[i].pose.orientation.w
                 );
             move(line++, 0);
         }
