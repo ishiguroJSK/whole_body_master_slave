@@ -344,6 +344,10 @@ int main(int argc, char** argv) {
         ///// draw common info
         printw("Drawn frame count %d", draw_cnt);
         move(line++, 0);
+        printw("Master = %s", master_uri.c_str());
+        move(line++, 0);
+        printw("Slave  = %s", slave_uri.c_str());
+        move(line++, 0);
         printw("Master side communication delay %8.3f [ms] ( now %12.6f [s] / rcv %12.6f [s] )",
             now.master_delay.toSec()*1e3, ros_time_now.toSec(), now.master_rcv_time.toSec());
         move(line++, 0);
