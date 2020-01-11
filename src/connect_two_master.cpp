@@ -47,12 +47,6 @@ struct ros_shm_t{
     ros::Time master_rcv_time, slave_rcv_time;
 };
 
-// void onMasterTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticPoseStamed* ret_ptr){
-//     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
-//     ret_ptr->header.seq     = msg->header.seq;
-//     ret_ptr->header.stamp   = msg->header.stamp;
-//     ret_ptr->pose           = msg->pose;
-// }
 void onTgtPoseCB(const geometry_msgs::PoseStamped::ConstPtr& msg, StaticSizedPoseStamed* ret_ptr){
     msg->header.frame_id.copy(ret_ptr->header.frame_id, MAX_FRAME_ID_SIZE);
     ret_ptr->header.seq     = msg->header.seq;
@@ -229,6 +223,7 @@ void slave_side_process(int argc, char** argv) {
     while (ros::ok()) {
         ros_shm_t now = *shmaddr; // copy from shm as soon as possible TODO mutex?
         for(int i=0; i<tgt_names.size(); i++){
+            if(tgt_names[i] == "lhand" || tgt_names[i] == "rhand" || tgt_names[i] == "head"){ continue; }// disable tablis unused topics
             if(now.masterTgtPoses[i].header.stamp != latest_p[i].header.stamp){ // update only if new data
                 latest_p[i].header.frame_id = now.masterTgtPoses[i].header.frame_id;
                 latest_p[i].header.stamp    = now.masterTgtPoses[i].header.stamp;
