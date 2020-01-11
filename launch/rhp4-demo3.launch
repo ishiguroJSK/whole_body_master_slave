@@ -3,18 +3,18 @@
   <remap from="/vive/controller_LHR_FFA77D42/joy" to="/vive_rh_joy" />
 
   <node name="image_republish_l" pkg="image_transport" type="republish" args="compressed raw">
-    <remap from="in"  to="/multisense/left/image_color" />
-    <remap from="out" to="/multisense/left/image_color_decompressed" />
+    <remap from="in"  to="/camera/color/image_raw" />
+    <remap from="out" to="/camera/color/image_raw_decompressed" />
   </node>
   <node name="image_republish_r" pkg="image_transport" type="republish" args="compressed raw">
-    <remap from="in"  to="/multisense/right/image_mono" />
-    <remap from="out" to="/multisense/right/image_mono_decompressed" />
+    <remap from="in"  to="/camera/color/image_raw" />
+    <remap from="out" to="/camera/color/image_raw_decompressed" />
   </node>
 
-  <remap to="/multisense/left/image_color_decompressed" from="/image_left" />
-  <remap to="/multisense/right/image_mono_decompressed" from="/image_right" />
-  <remap to="/multisense/left/image_color/camera_info" from="/camera_info_left" />
-  <remap to="/multisense/right/image_mono/camera_info" from="/camera_info_right" />    
+  <remap to="/camera/color/image_raw_decompressed" from="/image_left" />
+  <remap to="/camera/color/image_raw_decompressed" from="/image_right" />
+  <remap to="/camera/color/image_raw/camera_info" from="/camera_info_left" />
+  <remap to="/camera/color/image_raw/camera_info" from="/camera_info_right" />    
   <include file="$(find vive_ros)/launch/vive.launch"/>
 
   <node name="world_vive_to_operator_origin" pkg="tf" type="static_transform_publisher" args="0 2 0 -1.570796 0 0 /world /operator_origin 1000" />
