@@ -12,7 +12,7 @@ import math
 from std_msgs.msg import *
 from geometry_msgs.msg import *
 
-keys = ["com", "lleg", "rleg", "larm", "rarm", "head"]
+keys = ["com", "lleg", "rleg", "larm", "rarm", "head", "lhand", "rhand"]
 ids = ["X","Y","Z","r","p","y"]
 vals = [PoseStamped() for k in keys]
 
@@ -58,7 +58,8 @@ class App(QMainWindow):
       for i, s in zip(ids, ss):
         s.setRange(-100, 100)  # スライダの範囲
         s.setValue(0)  # 初期値
-        s.setTickPosition(QSlider.TicksBothSides) #スライダの目盛りを両方に出す
+        #s.setTickPosition(QSlider.TicksBothSides) #スライダの目盛りを両方に出す
+        s.setTickPosition(QSlider.TicksBelow)
         self.connect(s, SIGNAL('valueChanged(int)'), self.on_draw)
         hbox= QHBoxLayout()
         hbox.addWidget(QLabel(i))
