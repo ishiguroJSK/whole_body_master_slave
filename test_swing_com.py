@@ -1,62 +1,67 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 import sys
-import threading
 import time
-import signal
 import rospy
-import tf
+import signal
 import math
 from std_msgs.msg import *
 from geometry_msgs.msg import *
-
-pub_val_com = PoseStamped()
-pub_val_rf = PoseStamped()
-pub_val_lf = PoseStamped()
-pub_val_rh = PoseStamped()
-pub_val_lh = PoseStamped()
-pub_val_rfw = WrenchStamped()
-pub_val_lfw = WrenchStamped()
-pub_val_list = [pub_val_com, pub_val_rf, pub_val_lf, pub_val_rh, pub_val_lh, pub_val_rfw, pub_val_lfw]
-
-key_list = ["com", "rf", "lf", "rh", "lh", "rfw", "lfw"]
-label_list = ["X","Y","Z","R","P","Y"]
-topic_d = {"com":PoseStamped, "rf":PoseStamped, "lf":PoseStamped, "rh":PoseStamped, "lh":PoseStamped, "rfw":WrenchStamped, "lfw":WrenchStamped}
-
+import numpy as np
 
 if __name__ == '__main__':
   signal.signal(signal.SIGINT, signal.SIG_DFL)
-  pub_com = rospy.Publisher('/human_tracker_com_ref', PoseStamped, queue_size=10)
-  pub_rf = rospy.Publisher('/human_tracker_rf_ref', PoseStamped, queue_size=10)
-  pub_lf = rospy.Publisher('/human_tracker_lf_ref', PoseStamped, queue_size=10)
-  pub_rh = rospy.Publisher('/human_tracker_rh_ref', PoseStamped, queue_size=10)
-  pub_lh = rospy.Publisher('/human_tracker_lh_ref', PoseStamped, queue_size=10)
-  pub_rfw = rospy.Publisher('/human_tracker_rfw_ref', WrenchStamped, queue_size=10)
-  pub_lfw = rospy.Publisher('/human_tracker_lfw_ref', WrenchStamped, queue_size=10)
-  pub_list = [pub_com,pub_rf,pub_lf,pub_rh,pub_lh,pub_rfw,pub_lfw]
+  pub_com = rospy.Publisher('/master_com_pose', PoseStamped, queue_size=1)
+  pub_rf  = rospy.Publisher('/master_rleg_pose',  PoseStamped, queue_size=1)
+  pub_lf  = rospy.Publisher('/master_lleg_pose',  PoseStamped, queue_size=1)
+  pub_hz  = rospy.Publisher('/test_swing_com_hz',  Float32, queue_size=1)
   
-  rospy.init_node('humansync_test_publisher', anonymous=True)
-  r = rospy.Rate(100)
-  
+  rospy.init_node('test_swing_com', anonymous=True)
+  HZ = 100.0
+  r = rospy.Rate(HZ)
   
   pub_val_com = PoseStamped()
-  pub_val_rf = PoseStamped()
-  pub_val_lf = PoseStamped()
-  pub_val_rh = PoseStamped()
-  pub_val_lh = PoseStamped()
-  pub_val_rfw = WrenchStamped()
-  pub_val_lfw = WrenchStamped()
-  pub_val_list = [pub_val_com, pub_val_rf, pub_val_lf, pub_val_rh, pub_val_lh, pub_val_rfw, pub_val_lfw]
-  
-  print "start pub coil COM trajectory"
+  pub_val_rf  = PoseStamped()
+  pub_val_lf  = PoseStamped()
+  pub_val_hz  = Float32()
+
   loop = 0
-  HZ = 0;
   while not rospy.is_shutdown():
-    sec = loop/100.0
+    rospy.loginfo_throttle(1, "pub init")
+    pub_val_com.header.stamp = rospy.Time.now()
+    pub_val_rf.header.stamp = rospy.Time.now()
+    pub_val_lf.header.stamp = rospy.Time.now()
+    pub_com.publish(pub_val_com)
+    pub_rf.publish(pub_val_rf)
+    pub_lf.publish(pub_val_lf)
+    pub_hz.publish(pub_val_hz)
+    r.sleep()
+    loop += 1
+    if loop > 3 * HZ:
+      break
+  
+  loop = 0
+  phase = 0.0;
+  rospy.loginfo("start pub coil COM trajectory=")
+  while not rospy.is_shutdown():
+    sec = loop/HZ
     rad = 0.1
-    HZ = 0.01*sec
-    for i in range(len(pub_list)):
-      pub_val_list[0].pose.position.y = rad * math.sin(2*math.pi*HZ*sec)
-      pub_list[i].publish(pub_val_list[i])
+    com_hz = 0.01*sec
+    phase += 2*math.pi*com_hz*(1/HZ)
+    rospy.loginfo_throttle(1, "com_hz="+ str(com_hz))
+    # pub_val_com.pose.position.y = rad * math.sin(phase)
+    pub_val_com.pose.position.y = rad * ( 1.0 if math.sin(phase)>0 else -1.0)
+    pub_val_rf.pose.position.z  = rad * ( 1.0 if math.sin(phase)>0 else 0.0)
+    pub_val_lf.pose.position.z  = rad * ( 1.0 if math.sin(phase)<0 else 0.0)
+    pub_val_hz.data = com_hz
+
+    pub_val_com.header.stamp = rospy.Time.now()
+    pub_val_rf.header.stamp = rospy.Time.now()
+    pub_val_lf.header.stamp = rospy.Time.now()
+    pub_com.publish(pub_val_com)
+    pub_rf.publish(pub_val_rf)
+    pub_lf.publish(pub_val_lf)
+    pub_hz.publish(pub_val_hz)
+
     r.sleep()
     loop += 1
