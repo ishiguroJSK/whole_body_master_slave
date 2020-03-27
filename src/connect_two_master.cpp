@@ -210,8 +210,10 @@ void slave_side_process(int argc, char** argv) {
             boost::bind(onTgtPoseCB, _1, &shmaddr->slaveTgtPoses[i]),
             ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay()));
     }
-    ros::Publisher  delay_check_packet_pub = n.advertise<std_msgs::Time>("delay_check_packet_inbound", 1);
-    ros::Subscriber delay_check_packet_sub = n.subscribe<std_msgs::Time>("delay_check_packet_outbound", 1,
+    ros::Publisher  master_delay_ans_pub    = n.advertise<std_msgs::Float64>("master_delay_ans", 1);
+    ros::Publisher  slave_delay_ans_pub     = n.advertise<std_msgs::Float64>("slave_delay_ans", 1);
+    ros::Publisher  delay_check_packet_pub  = n.advertise<std_msgs::Time>("delay_check_packet_inbound", 1);
+    ros::Subscriber delay_check_packet_sub  = n.subscribe<std_msgs::Time>("delay_check_packet_outbound", 1,
                                 boost::bind(onSlaveDelayCheckPacketCB, _1, shmaddr),
                                 ros::VoidConstPtr(), ros::TransportHints().unreliable().reliable().tcpNoDelay());
     shmaddr->slave_side_process_ready = true;
@@ -241,6 +243,12 @@ void slave_side_process(int argc, char** argv) {
                 masterEEWrenches_pub[i].publish(latest_w[i]);
             }
         }
+        ////////////// calc and pub delay answer
+        std_msgs::Float64 master_delay_ans, slave_delay_ans;
+        master_delay_ans.data   = now.master_delay.toSec();
+        slave_delay_ans.data    = now.slave_delay.toSec();
+        master_delay_ans_pub.publish(master_delay_ans);
+        slave_delay_ans_pub.publish(slave_delay_ans);
         ////////////// send timestamp for delay calc
         std_msgs::Time abs_time_now;
         abs_time_now.data = ros::Time(ros::WallTime::now().sec, ros::WallTime::now().nsec);
