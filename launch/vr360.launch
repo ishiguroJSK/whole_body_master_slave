@@ -1,0 +1,52 @@
+<launch>
+
+  <!-- <node pkg="rviz" type="rviz" name="rviz" args="-l -d $(find rviz_textured_sphere)/rviz_cfg/rviz_textured_sphere.rviz" output="screen"/> -->
+  <node pkg="rviz" type="rviz" name="rviz" args="-l -d $(find whole_body_master_slave)/config/vr360.rviz" output="screen"/>
+  <!-- <include file="$(find whole_body_master_slave)/launch/vr360.launch" /> -->
+
+  <arg name="use_rviz" default="true" />
+  <!-- launch rviz with config/rviz_camera_stream.rviz -->
+  <!-- <node pkg="rviz" type="rviz" name="rviz" -->
+  <!-- 	args="-d $(find rviz_camera_stream)/config/rviz_camera_stream.rviz" -->
+  <!-- 	if="$(arg use_rviz)" /> -->
+
+  <!-- slave side 360cam tf -->
+  <node pkg="tf" type="static_transform_publisher" name="dummy_slave_cam_tf" args="0 0 1 0 0 0 map slave_cam 10" />
+  
+  <!-- slave side 360cam tf -->
+  <node pkg="tf" type="static_transform_publisher" name="tex_sph_conv_tf" args="0 0 0 3.1415 0 0 slave_cam tex_sph_conv 10" />
+  
+  <!-- dummy hmd tf -->
+  <node pkg="tf" type="static_transform_publisher" name="dummy_hmd_tf" args="0 0 1.234 0 0 0 1 map hmd 10" />
+  
+  <group ns="rviz_cam_L">
+    <node pkg="tf" type="static_transform_publisher" name="camera_tf" args="0 0.1 0 -1.57 0 -1.57 hmd rviz_cam_L 10" />
+    <node name="camera_info" pkg="rostopic" type="rostopic"
+	  args="pub camera_info sensor_msgs/CameraInfo
+		'{header: {seq: 0, stamp: {secs: 0, nsecs: 0}, frame_id: 'rviz_cam_L'},
+		height: 720, width: 1280, distortion_model: 'plumb_bob',
+		D: [0],
+		K: [300.0, 0.0, 640, 0.0, 300.0, 360.0, 0.0, 0.0, 1.0],
+		R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+		P: [300.0, 0.0, 640, 0.0, 0.0, 300, 360, 0.0, 0.0, 0.0, 1.0, 0.0],
+		binning_x: 0, binning_y: 0,
+		roi: {x_offset: 0, y_offset: 0, height: 720, width: 1280, do_rectify: false}}' -r 2"
+	  output="screen"/>
+  </group>
+
+  <group ns="rviz_cam_R">
+    <node pkg="tf" type="static_transform_publisher" name="camera_tf" args="0 -0.1 0 -1.57 0 -1.57 hmd rviz_cam_R 10" />
+    <node name="camera_info" pkg="rostopic" type="rostopic"
+	  args="pub camera_info sensor_msgs/CameraInfo
+		'{header: {seq: 0, stamp: {secs: 0, nsecs: 0}, frame_id: 'rviz_cam_R'},
+		height: 720, width: 1280, distortion_model: 'plumb_bob',
+		D: [0],
+		K: [300.0, 0.0, 640, 0.0, 300.0, 360.0, 0.0, 0.0, 1.0],
+		R: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+		P: [300.0, 0.0, 640, 0.0, 0.0, 300, 360, 0.0, 0.0, 0.0, 1.0, 0.0],
+		binning_x: 0, binning_y: 0,
+		roi: {x_offset: 0, y_offset: 0, height: 720, width: 1280, do_rectify: false}}' -r 2"
+	  output="screen"/>
+  </group>
+
+</launch>
