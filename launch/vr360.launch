@@ -42,13 +42,12 @@
   </group>
 
   <!-- vive_ros setting -->
-  <include file="$(find vive_ros)/launch/vive.launch">
-    <remap from="camera_info_left"  to="/rviz_cam_L/camera_info"/>
-    <remap from="camera_info_right" to="/rviz_cam_R/camera_info"/>
-  </include>
+  <remap from="/camera_info_left"  to="/rviz_cam_L/camera_info"/>
+  <remap from="/camera_info_right" to="/rviz_cam_R/camera_info"/>
+  <remap from="/image_left"       to="/rviz_cam_L/image" />
+  <remap from="/image_right"      to="/rviz_cam_R/image" />
+  <include file="$(find vive_ros)/launch/vive.launch"/>
 
-  <remap from="/image_left"  to="/rviz_cam_L/image" />
-  <remap from="/image_right" to="/rviz_cam_R/image" />
   <remap from="/vive/controller_LHR_FFDEDD47/joy" to="/vive_lh_joy" />
   <remap from="/vive/controller_LHR_FFA77D42/joy" to="/vive_rh_joy" />
   
