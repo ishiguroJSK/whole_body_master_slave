@@ -370,7 +370,7 @@ int main(int argc, char** argv) {
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "master_"+tgt_names[i]+"_pose";
-            printw(" %-17s ",topic.c_str());
+            printw(" %-18s ",topic.c_str());
             printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.masterTgtPoses[i].header.seq, fps,
                 now.masterTgtPoses[i].pose.position.x,
                 now.masterTgtPoses[i].pose.position.y,
@@ -393,7 +393,7 @@ int main(int argc, char** argv) {
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "master_"+ee_names[i]+"_wrench";
-            printw(" %-17s ",topic.c_str());
+            printw(" %-18s ",topic.c_str());
             printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.masterEEWrenches[i].header.seq, fps,
                 now.masterEEWrenches[i].wrench.force.x,
                 now.masterEEWrenches[i].wrench.force.y,
@@ -417,7 +417,7 @@ int main(int argc, char** argv) {
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "slave_"+tgt_names[i]+"_pose";
-            printw(" %-17s ",topic.c_str());
+            printw(" %-18s ",topic.c_str());
             printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveTgtPoses[i].header.seq, fps,
                 now.slaveTgtPoses[i].pose.position.x,
                 now.slaveTgtPoses[i].pose.position.y,
@@ -440,7 +440,7 @@ int main(int argc, char** argv) {
             else{               attrset(COLOR_PAIR(3)); printw("%8s", "NOT_RECV");}
             attrset(0);
             std::string topic = "slave_"+ee_names[i]+"_wrench";
-            printw(" %-17s ",topic.c_str());
+            printw(" %-18s ",topic.c_str());
             printw("[%9df @ %4d fps] %8.3f %8.3f %8.3f %8.3f %8.3f %8.3f ", now.slaveEEWrenches[i].header.seq, fps,
                 now.slaveEEWrenches[i].wrench.force.x,
                 now.slaveEEWrenches[i].wrench.force.y,
